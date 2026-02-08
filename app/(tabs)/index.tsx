@@ -171,6 +171,13 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              onPress={() => router.push('/settings')}
+              className="bg-surface border border-border rounded-lg py-3 items-center"
+            >
+              <Text className="text-foreground font-semibold">الإعدادات</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               disabled={isInitializing}
               onPress={handleDisconnect}
               className={`py-3 rounded-lg items-center ${

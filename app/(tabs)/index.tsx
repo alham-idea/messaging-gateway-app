@@ -134,7 +134,10 @@ export default function HomeScreen() {
 
           {/* الأزرار */}
           <View className="gap-3">
-            <TouchableOpacity className="bg-primary rounded-lg py-3 items-center">
+            <TouchableOpacity
+              onPress={() => router.push('/whatsapp')}
+              className="bg-primary rounded-lg py-3 items-center"
+            >
               <Text className="text-white font-semibold">فتح واتساب</Text>
             </TouchableOpacity>
 

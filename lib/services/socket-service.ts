@@ -168,8 +168,9 @@ class SocketService {
    * معالجة الرسائل الواردة من المنصة
    */
   private handleIncomingMessage(payload: MessagePayload): void {
-    // سيتم تنفيذ المنطق هنا في الأطوار اللاحقة
+    // سيتم استدعاء خدمة معالجة الرسائل
     console.log('معالجة الرسالة الواردة:', payload);
+    // سيتم تنفيذ هذا في الخدمة الرئيسية
   }
 
   /**

@@ -32,7 +32,7 @@ const env = {
   appSlug: "messaging-gateway-app",
   // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
   // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: "",
+  logoUrl: "https://private-us-east-1.manuscdn.com/sessionFile/NEQNFYPUrgHKreA4POkVmk/sandbox/YvvKhQue3MPYfM7GhUAmuj-img-1_1770589500000_na1fn_aWNvbg.png?x-oss-process=image/resize,w_1920,h_1920/format,webp/quality,q_80&Expires=1798761600&Policy=eyJTdGF0ZW1lbnQiOlt7IlJlc291cmNlIjoiaHR0cHM6Ly9wcml2YXRlLXVzLWVhc3QtMS5tYW51c2Nkbi5jb20vc2Vzc2lvbkZpbGUvTkVRTkZZUFVyZ0hLcmVBNFBPa1Ztay9zYW5kYm94L1l2dktoUXVlM01QWWZNN0doVUFtdWotaW1nLTFfMTc3MDU4OTUwMDAwMF9uYTFmbl9hV052YmcucG5nP3gtb3NzLXByb2Nlc3M9aW1hZ2UvcmVzaXplLHdfMTkyMCxoXzE5MjAvZm9ybWF0LHdlYnAvcXVhbGl0eSxxXzgwIiwiQ29uZGl0aW9uIjp7IkRhdGVMZXNzVGhhbiI6eyJBV1M6RXBvY2hUaW1lIjoxNzk4NzYxNjAwfX19XX0_&Key-Pair-Id=K2HSFNDJXOU9YS&Signature=OWEehKpwZufvaMOqwkiUO9qPCQx6~tGJai0m-V2SPnbf-RSDfmTsHatsSRjfMOsJtrcFAHJAOt8zHmidf3YqNOwaGAs3FF2bRw5Mf5lY-MnY~DeM7S1fFkt5XKis1INdux599rPzSeA2jGnEPatB5To0x1bKnVRk08JjMaDYltsJ62aM7WQU86Qo5CFBvpWGKe63oz8vXlrb9Twk58bJNA4AwC0e6OPEn8j2sxPCBMTFWv7sN4h4mG2-oYh~fSYDTCthI8BmnfQSHdWCE54B7pGG7K35werCmVANBwGODtPHWcREm2Z2w0l5Y08nDVamCaXH8WWr-Rkn8-6Dgy5k8g__",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,

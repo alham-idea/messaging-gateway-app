@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Text, View, TouchableOpacity, FlatList } from 'react-native';
+import { ScrollView, Text, View, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useRouter } from 'expo-router';
 import { socketService } from '@/lib/services/socket-service';
 import { deviceStatusService } from '@/lib/services/device-status-service';
+import { useBackgroundService } from '@/hooks/use-background-service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface LogEntry {
@@ -15,6 +16,7 @@ interface LogEntry {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { status, startService, stopService, isInitializing } = useBackgroundService();
   const [isConnected, setIsConnected] = useState(false);
   const [batteryLevel, setBatteryLevel] = useState(0);
   const [networkType, setNetworkType] = useState('unknown');
@@ -24,12 +26,17 @@ export default function HomeScreen() {
   useEffect(() => {
     checkConnection();
     updateStatus();
+    
+    // بدء خدمة الخلفية عند فتح التطبيق
+    startService();
 
     // تحديث الحالة كل 5 ثوان
     const interval = setInterval(updateStatus, 5000);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [startService]);
 
   const checkConnection = async () => {
     const url = await AsyncStorage.getItem('socketUrl');
@@ -40,9 +47,10 @@ export default function HomeScreen() {
 
   const updateStatus = () => {
     setIsConnected(socketService.isConnected());
-    const status = deviceStatusService.getStatus();
+    const deviceStatus = deviceStatusService.getStatus();
     setBatteryLevel(deviceStatusService.getBatteryPercentage());
-    setNetworkType(status.networkType);
+    setNetworkType(deviceStatus.networkType);
+    setQueueCount(status.pendingMessages);
 
     // إضافة سجل
     if (socketService.isConnected()) {
@@ -58,14 +66,28 @@ export default function HomeScreen() {
       message,
     };
 
-    setLogs((prev) => [newLog, ...prev].slice(0, 50)); // الاحتفاظ بآخر 50 سجل
+    setLogs((prev) => [newLog, ...prev].slice(0, 50));
   };
 
   const handleDisconnect = async () => {
-    socketService.disconnect();
-    deviceStatusService.stopMonitoring();
-    await AsyncStorage.removeItem('socketUrl');
-    router.replace('/(tabs)');
+    Alert.alert(
+      'تأكيد',
+      'هل تريد قطع الاتصال وإيقاف خدمة الخلفية؟',
+      [
+        { text: 'إلغاء', onPress: () => {}, style: 'cancel' },
+        {
+          text: 'نعم',
+          onPress: async () => {
+            await stopService();
+            socketService.disconnect();
+            deviceStatusService.stopMonitoring();
+            await AsyncStorage.removeItem('socketUrl');
+            router.replace('/(tabs)');
+          },
+          style: 'destructive',
+        },
+      ]
+    );
   };
 
   const getStatusColor = () => {
@@ -100,7 +122,7 @@ export default function HomeScreen() {
           </View>
 
           {/* بطاقة معلومات الجهاز */}
-          <View className="grid grid-cols-2 gap-4">
+          <View className="gap-4">
             {/* البطارية */}
             <View className="bg-surface rounded-lg p-4 border border-border">
               <Text className="text-xs text-muted mb-2">البطارية</Text>
@@ -149,11 +171,37 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              disabled={isInitializing}
               onPress={handleDisconnect}
-              className="bg-error/10 border border-error rounded-lg py-3 items-center"
+              className={`py-3 rounded-lg items-center ${
+                isInitializing ? 'bg-error/50' : 'bg-error/10 border border-error'
+              }`}
             >
-              <Text className="text-error font-semibold">قطع الاتصال</Text>
+              <Text className="text-error font-semibold">
+                {isInitializing ? 'جاري...' : 'قطع الاتصال'}
+              </Text>
             </TouchableOpacity>
+
+            {/* بطاقة حالة خدمة الخلفية */}
+            <View className="bg-surface rounded-lg p-4 border border-border">
+              <View className="flex-row items-center justify-between mb-3">
+                <Text className="text-sm font-semibold text-foreground">
+                  خدمة الخلفية
+                </Text>
+                <View
+                  className="w-3 h-3 rounded-full"
+                  style={{
+                    backgroundColor: status.isRunning ? '#10b981' : '#ef4444',
+                  }}
+                />
+              </View>
+              <Text className="text-xs text-muted mb-2">
+                محاولات إعادة الاتصال: {status.reconnectAttempts}/{status.maxReconnectAttempts}
+              </Text>
+              <Text className="text-xs text-muted">
+                رسائل معلقة: {status.pendingMessages}
+              </Text>
+            </View>
           </View>
 
           {/* السجل الأخير */}

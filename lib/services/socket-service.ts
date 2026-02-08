@@ -38,6 +38,14 @@ class SocketService {
   private maxReconnectAttempts = 10;
   private reconnectDelay = 5000;
   private statusUpdateInterval: NodeJS.Timeout | null = null;
+  private clientId: string = '';
+  private connectionStats = {
+    lastConnectedTime: null as number | null,
+    connectionAttempts: 0,
+    lastError: null as string | null,
+    uptime: 0,
+  };
+  private uptimeInterval: ReturnType<typeof setInterval> | null = null;
 
   /**
    * تهيئة الاتصال بـ Socket.io
@@ -65,14 +73,20 @@ class SocketService {
         // معالج الاتصال الناجح
         this.socket.on('connect', () => {
           console.log('✓ متصل بالمنصة');
+          this.clientId = this.socket?.id || '';
           this.reconnectAttempts = 0;
+          this.connectionStats.lastConnectedTime = Date.now();
+          this.connectionStats.connectionAttempts++;
+          this.connectionStats.lastError = null;
           this.startStatusUpdates();
+          this.startUptimeCounter();
           resolve();
         });
 
         // معالج فشل الاتصال
         this.socket.on('connect_error', (error: any) => {
           console.error('✗ خطأ في الاتصال:', error);
+          this.connectionStats.lastError = error?.message || 'خطأ في الاتصال';
           reject(error);
         });
 
@@ -80,6 +94,7 @@ class SocketService {
         this.socket.on('disconnect', (reason: any) => {
           console.log('✗ تم قطع الاتصال:', reason);
           this.stopStatusUpdates();
+          this.stopUptimeCounter();
         });
 
         // معالج استقبال الأوامر من المنصة
@@ -105,9 +120,31 @@ class SocketService {
   public disconnect(): void {
     if (this.socket) {
       this.stopStatusUpdates();
+      this.stopUptimeCounter();
       this.socket.disconnect();
       this.socket = null;
+      this.connectionStats.uptime = 0;
       console.log('تم قطع الاتصال بالمنصة');
+    }
+  }
+
+  /**
+   * بدء عداد وقت التشغيل
+   */
+  private startUptimeCounter(): void {
+    this.stopUptimeCounter();
+    this.uptimeInterval = setInterval(() => {
+      this.connectionStats.uptime++;
+    }, 1000);
+  }
+
+  /**
+   * إيقاف عداد وقت التشغيل
+   */
+  private stopUptimeCounter(): void {
+    if (this.uptimeInterval) {
+      clearInterval(this.uptimeInterval);
+      this.uptimeInterval = null;
     }
   }
 
@@ -178,6 +215,23 @@ class SocketService {
    */
   public getSocket(): Socket | null {
     return this.socket;
+  }
+
+  /**
+   * الحصول على معرّف العميل
+   */
+  public getClientId(): string {
+    if (!this.clientId && this.socket) {
+      this.clientId = this.socket.id || 'unknown';
+    }
+    return this.clientId;
+  }
+
+  /**
+   * الحصول على إحصائيات الاتصال
+   */
+  public getConnectionStats() {
+    return { ...this.connectionStats };
   }
 
   /**

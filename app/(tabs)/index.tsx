@@ -178,6 +178,13 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              onPress={() => router.push('/connection-manager')}
+              className="bg-surface border border-border rounded-lg py-3 items-center"
+            >
+              <Text className="text-foreground font-semibold">إدارة الاتصال</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               disabled={isInitializing}
               onPress={handleDisconnect}
               className={`py-3 rounded-lg items-center ${

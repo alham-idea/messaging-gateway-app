@@ -164,10 +164,10 @@ export default function HomeScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              onPress={() => {}}
+              onPress={() => router.push('/logs')}
               className="bg-surface border border-border rounded-lg py-3 items-center"
             >
-              <Text className="text-foreground font-semibold">عرض السجل (قريباً)</Text>
+              <Text className="text-foreground font-semibold">عرض السجل</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

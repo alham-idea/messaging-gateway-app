@@ -89,6 +89,7 @@ export default function RootLayout() {
             <Stack.Screen name="setup" />
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="whatsapp" />
+            <Stack.Screen name="logs" />
             <Stack.Screen name="oauth/callback" />
           </Stack>
           <StatusBar style="auto" />

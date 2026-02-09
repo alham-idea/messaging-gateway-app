@@ -2,6 +2,8 @@ import { socketService, MessagePayload, MessageResponse } from './socket-service
 import { whatsAppService } from './whatsapp-service';
 import * as SMS from 'expo-sms';
 import { Platform } from 'react-native';
+import { retryService } from './retry-service';
+import { logService } from './log-service';
 
 export interface ProcessedMessage {
   id: string;
@@ -92,13 +94,25 @@ class MessageHandlerService {
       processedMessage.status = 'failed';
       processedMessage.error = error instanceof Error ? error.message : 'خطأ غير معروف';
 
-      // محاولة الإرسال عبر SMS كخيار احتياطي
+      // إضافة الرسالة إلى قائمة إعادة المحاولة
+      const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
+      retryService.addFailedMessage(
+        payload.id,
+        payload.phoneNumber,
+        payload.message,
+        payload.type,
+        errorMessage
+      );
+
+      // محاولة الإرسال عبر SMS كخيار احتياطي (فقط للواتساب)
       if (payload.type === 'whatsapp') {
         console.log('📱 محاولة الإرسال عبر SMS كخيار احتياطي');
         try {
           await this.sendViaSMS(payload);
           processedMessage.status = 'sent';
           processedMessage.error = undefined;
+          // إزالة من قائمة إعادة المحاولة عند النجاح
+          retryService.removeFailedMessage(payload.id);
         } catch (smsError) {
           console.error('❌ فشل الإرسال عبر SMS أيضاً:', smsError);
           processedMessage.error = `واتساب: ${processedMessage.error}, SMS: ${smsError instanceof Error ? smsError.message : 'خطأ غير معروف'}`;
@@ -108,6 +122,11 @@ class MessageHandlerService {
 
     // إضافة إلى السجل
     this.messageHistory.push(processedMessage);
+
+    // إذا نجحت الرسالة، إزالتها من قائمة إعادة المحاولة
+    if (processedMessage.status === 'sent') {
+      retryService.removeFailedMessage(payload.id);
+    }
 
     // إرسال التقرير إلى المنصة
     this.sendResponse(processedMessage);

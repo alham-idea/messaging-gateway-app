@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { socketService } from '@/lib/services/socket-service';
 import { deviceStatusService } from '@/lib/services/device-status-service';
 import { useBackgroundService } from '@/hooks/use-background-service';
+import { useRetryManager } from '@/hooks/use-retry-manager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface LogEntry {
@@ -17,6 +18,7 @@ interface LogEntry {
 export default function HomeScreen() {
   const router = useRouter();
   const { status, startService, stopService, isInitializing } = useBackgroundService();
+  const { stats: retryStats } = useRetryManager();
   const [isConnected, setIsConnected] = useState(false);
   const [batteryLevel, setBatteryLevel] = useState(0);
   const [networkType, setNetworkType] = useState('unknown');
@@ -154,6 +156,29 @@ export default function HomeScreen() {
             </Text>
           </View>
 
+          {/* بطاقة الرسائل الفاشلة */}
+          {retryStats.totalFailed > 0 && (
+            <View className="bg-error/10 rounded-lg p-4 border border-error">
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-sm font-semibold text-error">رسائل فاشلة</Text>
+                <View className="bg-error rounded-full px-2 py-1">
+                  <Text className="text-xs font-bold text-background">
+                    {retryStats.totalFailed}
+                  </Text>
+                </View>
+              </View>
+              <Text className="text-xs text-error/70 mb-3">
+                {retryStats.pendingRetries} معلقة، {retryStats.failedFinal} فشل نهائي
+              </Text>
+              <TouchableOpacity
+                onPress={() => router.push('/failed-messages')}
+                className="bg-error rounded-lg py-2 items-center"
+              >
+                <Text className="text-sm font-semibold text-background">عرض التفاصيل</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* الأزرار */}
           <View className="gap-3">
             <TouchableOpacity
@@ -182,6 +207,13 @@ export default function HomeScreen() {
               className="bg-surface border border-border rounded-lg py-3 items-center"
             >
               <Text className="text-foreground font-semibold">إدارة الاتصال</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push('/failed-messages')}
+              className="bg-surface border border-border rounded-lg py-3 items-center"
+            >
+              <Text className="text-foreground font-semibold">الرسائل الفاشلة</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

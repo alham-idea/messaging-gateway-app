@@ -1,26 +1,17 @@
-import { WebViewMessageEvent } from 'react-native-webview';
 import { socketService, MessageResponse } from './socket-service';
+import { logService } from './log-service';
 
-export interface WhatsAppMessage {
-  id: string;
-  phoneNumber: string;
-  message: string;
-  timestamp: number;
-  status: 'pending' | 'sent' | 'delivered' | 'read' | 'failed' | 'received';
-}
-
-export interface WhatsAppSendRequest {
-  phoneNumber: string;
-  message: string;
-  messageId: string;
-}
-
-class WhatsAppService {
+/**
+ * خدمة واتساب ويب محسّنة لسطح المكتب
+ * تستخدم User-Agent لسطح المكتب وتدعم الميزات الكاملة
+ */
+class WhatsAppDesktopService {
   private webViewRef: any = null;
-  private messageQueue: WhatsAppSendRequest[] = [];
+  private messageQueue: any[] = [];
   private isReady = false;
-  private incomingMessages: WhatsAppMessage[] = [];
-  private messageListeners: ((message: WhatsAppMessage) => void)[] = [];
+  private incomingMessages: any[] = [];
+  private messageListeners: ((message: any) => void)[] = [];
+  private isDesktopVersion = false;
 
   /**
    * تعيين مرجع WebView
@@ -28,19 +19,26 @@ class WhatsAppService {
   public setWebViewRef(ref: any): void {
     this.webViewRef = ref;
     console.log('✓ تم تعيين مرجع WebView');
+    logService.addLog({
+      type: 'system',
+      direction: 'internal',
+      status: 'sent',
+      message: 'تم تعيين مرجع WebView للواتساب',
+      timestamp: Date.now(),
+    });
   }
 
   /**
    * معالجة الرسائل الواردة من WebView
    */
-  public handleWebViewMessage(event: WebViewMessageEvent): void {
+  public handleWebViewMessage(event: any): void {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('📨 رسالة من WebView:', data);
 
       switch (data.type) {
         case 'WHATSAPP_READY':
-          this.handleWhatsAppReady();
+          this.handleWhatsAppReady(data);
           break;
         case 'MESSAGE_SENT':
           this.handleMessageSent(data);
@@ -50,6 +48,9 @@ class WhatsAppService {
           break;
         case 'ERROR':
           this.handleError(data);
+          break;
+        case 'DESKTOP_DETECTED':
+          this.handleDesktopDetected(data);
           break;
         default:
           console.log('نوع رسالة غير معروف:', data.type);
@@ -79,40 +80,31 @@ class WhatsAppService {
   /**
    * إرسال رسالة عبر واتساب
    */
-  public async sendMessage(phoneNumber: string, message: string, messageId: string): Promise<void> {
+  public sendMessage(phoneNumber: string, message: string, messageId: string): void {
     if (!this.isReady) {
-      console.warn('⚠️ واتساب غير جاهز، سيتم إضافة الرسالة إلى الطابور');
+      console.log('⏳ واتساب غير جاهز، إضافة الرسالة إلى الطابور');
       this.messageQueue.push({ phoneNumber, message, messageId });
       return;
     }
 
-    // تنسيق رقم الهاتف (إزالة الأحرف غير الرقمية)
-    const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
+    // صيغة الرابط الكاملة لسطح المكتب
+    const url = `https://web.whatsapp.com/send/?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
 
-    // كود JavaScript لإرسال الرسالة
     const jsCode = `
-      (async () => {
+      (function() {
         try {
-          // البحث عن حقل البحث أو الدردشة
-          const searchInput = document.querySelector('[contenteditable="true"]');
+          // الانتقال إلى الرسالة
+          window.location.href = '${url}';
           
-          if (!searchInput) {
-            throw new Error('لم يتم العثور على حقل الإدخال');
-          }
-
-          // محاولة الوصول إلى الرسالة من خلال واجهة الويب
-          const messageInput = document.querySelector('[aria-label="اكتب رسالة"]') || 
-                              document.querySelector('[contenteditable="true"]');
-          
-          if (messageInput) {
-            messageInput.textContent = '${message}';
-            messageInput.dispatchEvent(new Event('input', { bubbles: true }));
-            
-            // البحث عن زر الإرسال
+          // الانتظار قليلاً ثم محاولة الضغط على زر الإرسال
+          setTimeout(() => {
+            // البحث عن زر الإرسال بطرق متعددة
             const sendButton = document.querySelector('[data-testid="send"]') ||
-                              document.querySelector('[aria-label="أرسل"]') ||
+                              document.querySelector('button[aria-label*="Send"]') ||
+                              document.querySelector('button[aria-label*="أرسل"]') ||
                               Array.from(document.querySelectorAll('button')).find(btn => 
-                                btn.textContent.includes('أرسل') || btn.textContent.includes('Send')
+                                btn.getAttribute('aria-label')?.includes('Send') ||
+                                btn.getAttribute('aria-label')?.includes('أرسل')
                               );
             
             if (sendButton) {
@@ -126,9 +118,7 @@ class WhatsAppService {
             } else {
               throw new Error('لم يتم العثور على زر الإرسال');
             }
-          } else {
-            throw new Error('لم يتم العثور على حقل الرسالة');
-          }
+          }, 2000);
         } catch (error) {
           window.postMessage({
             type: 'ERROR',
@@ -146,12 +136,36 @@ class WhatsAppService {
   /**
    * معالجة حدث جاهزية واتساب
    */
-  private handleWhatsAppReady(): void {
+  private handleWhatsAppReady(data: any): void {
     console.log('✓ واتساب جاهز للاستخدام');
     this.isReady = true;
 
+    logService.addLog({
+      type: 'system',
+      direction: 'internal',
+      status: 'sent',
+      message: 'واتساب ويب جاهز للاستخدام',
+      timestamp: Date.now(),
+    });
+
     // معالجة الرسائل المعلقة
     this.processPendingMessages();
+  }
+
+  /**
+   * معالجة اكتشاف نسخة سطح المكتب
+   */
+  private handleDesktopDetected(data: any): void {
+    this.isDesktopVersion = data.isDesktop;
+    console.log('🖥️ نسخة سطح المكتب مكتشفة:', this.isDesktopVersion);
+
+    logService.addLog({
+      type: 'system',
+      direction: 'internal',
+      status: 'sent',
+      message: `تم اكتشاف نسخة ${this.isDesktopVersion ? 'سطح المكتب' : 'الهاتف'}`,
+      timestamp: Date.now(),
+    });
   }
 
   /**
@@ -176,11 +190,19 @@ class WhatsAppService {
   private handleMessageSent(data: any): void {
     console.log('✓ تم إرسال الرسالة:', data.messageId);
 
+    logService.addLog({
+      type: 'whatsapp',
+      direction: 'sent',
+      status: 'sent',
+      message: `تم إرسال الرسالة بنجاح (${data.messageId})`,
+      timestamp: Date.now(),
+    });
+
     // إرسال تقرير إلى المنصة
     const response: MessageResponse = {
       messageId: data.messageId,
       status: 'sent',
-      timestamp: data.timestamp || Date.now(),
+      timestamp: Date.now(),
     };
 
     socketService.sendMessageResponse(response);
@@ -190,15 +212,23 @@ class WhatsAppService {
    * معالجة الرسالة الواردة
    */
   private handleMessageReceived(data: any): void {
-    const message: WhatsAppMessage = {
-      id: data.id || `msg_${Date.now()}`,
-      phoneNumber: data.phoneNumber || 'unknown',
-      message: data.message || '',
-      timestamp: data.timestamp || Date.now(),
-      status: 'received',
+    const message = {
+      id: `whatsapp_${Date.now()}`,
+      phoneNumber: data.phoneNumber,
+      message: data.message,
+      timestamp: Date.now(),
+      status: 'delivered' as const,
     };
 
     console.log('📨 رسالة واردة من واتساب:', message);
+
+    logService.addLog({
+      type: 'whatsapp',
+      direction: 'received',
+      status: 'sent',
+      message: `رسالة واردة من ${data.phoneNumber}: ${data.message}`,
+      timestamp: Date.now(),
+    });
 
     // إضافة إلى السجل
     this.incomingMessages.push(message);
@@ -216,6 +246,14 @@ class WhatsAppService {
   private handleError(data: any): void {
     console.error('❌ خطأ في واتساب:', data.error);
 
+    logService.addLog({
+      type: 'whatsapp',
+      direction: 'internal',
+      status: 'failed',
+      message: `خطأ: ${data.error}`,
+      timestamp: Date.now(),
+    });
+
     // إرسال تقرير خطأ إلى المنصة
     const response: MessageResponse = {
       messageId: data.messageId,
@@ -230,7 +268,7 @@ class WhatsAppService {
   /**
    * الاستماع للرسائل الواردة
    */
-  public onMessageReceived(callback: (message: WhatsAppMessage) => void): () => void {
+  public onMessageReceived(callback: (message: any) => void): () => void {
     this.messageListeners.push(callback);
 
     // إرجاع دالة لإزالة المستمع
@@ -242,7 +280,7 @@ class WhatsAppService {
   /**
    * الحصول على الرسائل الواردة
    */
-  public getIncomingMessages(): WhatsAppMessage[] {
+  public getIncomingMessages(): any[] {
     return [...this.incomingMessages];
   }
 
@@ -261,12 +299,29 @@ class WhatsAppService {
   }
 
   /**
-   * حقن كود المراقبة في واتساب
-   * هذه الدالة تحقن كود JavaScript لاكتشاف ومراقبة الرسالل
+   * التحقق من نسخة سطح المكتب
+   */
+  public isDesktop(): boolean {
+    return this.isDesktopVersion;
+  }
+
+  /**
+   * حقن كود المراقبة والاكتشاف
    */
   public injectMonitoringScript(): void {
     const monitoringCode = `
       (function() {
+        // اكتشاف نسخة سطح المكتب
+        const isDesktop = window.innerWidth > 768 && !navigator.userAgent.includes('Mobile');
+        console.log('🖥️ نسخة سطح المكتب:', isDesktop);
+        
+        window.postMessage({
+          type: 'DESKTOP_DETECTED',
+          isDesktop: isDesktop,
+          userAgent: navigator.userAgent,
+          timestamp: Date.now()
+        }, '*');
+
         // إخطار بأن واتساب جاهز
         window.postMessage({
           type: 'WHATSAPP_READY',
@@ -279,16 +334,14 @@ class WhatsAppService {
             // البحث عن الرسائل الجديدة
             const messages = document.querySelectorAll('[data-testid="msg-container"]');
             messages.forEach((msg) => {
-              const text = msg.textContent;
-              const sender = msg.getAttribute('data-from');
+              const senderElement = msg.querySelector('[data-testid="msg-sender"]');
+              const textElement = msg.querySelector('[data-testid="msg-text"]');
               
-              if (text && sender && !msg.dataset.processed) {
-                msg.dataset.processed = 'true';
-                
+              if (senderElement && textElement) {
                 window.postMessage({
                   type: 'MESSAGE_RECEIVED',
-                  phoneNumber: sender,
-                  message: text,
+                  phoneNumber: senderElement.textContent,
+                  message: textElement.textContent,
                   timestamp: Date.now()
                 }, '*');
               }
@@ -296,6 +349,7 @@ class WhatsAppService {
           });
         });
 
+        // بدء المراقبة
         observer.observe(document.body, {
           childList: true,
           subtree: true,
@@ -307,7 +361,19 @@ class WhatsAppService {
 
     this.injectJavaScript(monitoringCode);
   }
+
+  /**
+   * الحصول على إحصائيات الخدمة
+   */
+  public getStats() {
+    return {
+      isReady: this.isReady,
+      isDesktop: this.isDesktopVersion,
+      pendingMessages: this.messageQueue.length,
+      incomingMessages: this.incomingMessages.length,
+      messageListeners: this.messageListeners.length,
+    };
+  }
 }
 
-// تصدير instance واحد من الخدمة
-export const whatsAppService = new WhatsAppService();
+export const whatsAppDesktopService = new WhatsAppDesktopService();

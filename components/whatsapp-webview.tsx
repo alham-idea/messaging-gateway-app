@@ -91,8 +91,8 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         startInLoadingState={true}
-        scalesPageToFit={true}
-        userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        scalesPageToFit={false}
+        userAgent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         // السماح بالوصول إلى الكاميرا والميكروفون إذا لزم الأمر
         mediaPlaybackRequiresUserAction={false}
         allowsInlineMediaPlayback={true}

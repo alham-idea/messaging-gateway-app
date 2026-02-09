@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import WebView from 'react-native-webview';
-import { whatsAppService } from '@/lib/services/whatsapp-service';
+import { whatsAppDesktopService } from '@/lib/services/whatsapp-desktop-service';
 
 interface WhatsAppWebViewProps {
   onReady?: () => void;
@@ -13,14 +13,20 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const [stats, setStats] = useState({ isReady: false, isDesktop: false, pendingMessages: 0, incomingMessages: 0 });
 
   useEffect(() => {
-    // تعيين مرجع WebView للخدمة
-    whatsAppService.setWebViewRef(webViewRef.current);
+    // تعيين مرجع WebView للخدمة الجديدة
+    whatsAppDesktopService.setWebViewRef(webViewRef.current);
   }, []);
 
   const handleWebViewMessage = (event: any) => {
-    whatsAppService.handleWebViewMessage(event);
+    whatsAppDesktopService.handleWebViewMessage(event);
+    // تحديث الإحصائيات
+    const currentStats = whatsAppDesktopService.getStats();
+    setStats(currentStats);
+    setIsDesktop(currentStats.isDesktop);
   };
 
   const handleLoadStart = () => {
@@ -30,8 +36,8 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
 
   const handleLoadEnd = () => {
     setIsLoading(false);
-    // حقن كود المراقبة بعد تحميل الصفحة
-    whatsAppService.injectMonitoringScript();
+    // حقن كود المراقبة والاكتشاف بعد تحميل الصفحة
+    whatsAppDesktopService.injectMonitoringScript();
     setIsReady(true);
     onReady?.();
   };
@@ -44,18 +50,13 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
     console.error(errorMsg);
   };
 
-  const handleWebViewError = (error: string) => {
-    setError(error);
-    onError?.(error);
-  };
-
   return (
     <View className="flex-1 bg-background">
       {/* شريط الأدوات */}
       <View className="bg-surface border-b border-border px-4 py-3 flex-row items-center justify-between">
         <View className="flex-1">
           <Text className="text-sm font-semibold text-foreground">
-            واتساب ويب
+            واتساب ويب {isDesktop ? '🖥️ سطح المكتب' : '📱 الهاتف'}
           </Text>
           <Text className="text-xs text-muted mt-1">
             {isReady ? '✓ جاهز' : isLoading ? 'جاري التحميل...' : 'غير متصل'}
@@ -66,6 +67,24 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
           <ActivityIndicator color="#1e3a8a" size="small" />
         )}
       </View>
+
+      {/* شريط الإحصائيات */}
+      {isReady && (
+        <View className="bg-surface/50 border-b border-border px-4 py-2 flex-row justify-around">
+          <View className="items-center">
+            <Text className="text-xs text-muted">رسائل معلقة</Text>
+            <Text className="text-sm font-semibold text-foreground">{stats.pendingMessages}</Text>
+          </View>
+          <View className="items-center">
+            <Text className="text-xs text-muted">رسائل واردة</Text>
+            <Text className="text-sm font-semibold text-foreground">{stats.incomingMessages}</Text>
+          </View>
+          <View className="items-center">
+            <Text className="text-xs text-muted">الحالة</Text>
+            <Text className="text-sm font-semibold text-foreground">{stats.isReady ? '✓' : '✗'}</Text>
+          </View>
+        </View>
+      )}
 
       {/* رسالة الخطأ */}
       {error && (

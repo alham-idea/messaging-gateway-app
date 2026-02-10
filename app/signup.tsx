@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { cn } from '@/lib/utils';
+import { authService } from '@/lib/services/auth-client-service';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -62,27 +63,14 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          businessName: formData.businessName,
-          businessAddress: formData.businessAddress,
-          businessPhone: formData.businessPhone,
-          username: formData.username,
-          email: formData.email,
-          password: formData.password,
-        }),
+      await authService.register({
+        businessName: formData.businessName,
+        businessAddress: formData.businessAddress,
+        businessPhone: formData.businessPhone,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert('خطأ في التسجيل', data.error || 'حدث خطأ ما');
-        return;
-      }
 
       Alert.alert('نجح التسجيل', 'تم إنشاء حسابك بنجاح', [
         {
@@ -91,7 +79,7 @@ export default function SignupScreen() {
         },
       ]);
     } catch (error) {
-      Alert.alert('خطأ', 'فشل الاتصال بالخادم');
+      Alert.alert('خطأ في التسجيل', error instanceof Error ? error.message : 'حدث خطأ ما');
       console.error('Signup error:', error);
     } finally {
       setLoading(false);
@@ -306,7 +294,7 @@ export default function SignupScreen() {
             {/* Login Link */}
             <View className="flex-row items-center justify-center mb-8">
               <Text className="text-sm text-muted">لديك حساب بالفعل؟ </Text>
-              <TouchableOpacity onPress={() => router.replace('/login')}>
+              <TouchableOpacity onPress={() => router.push('/login' as any)}>
                 <Text className="text-sm font-semibold text-primary">
                   تسجيل الدخول
                 </Text>

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { cn } from '@/lib/utils';
+import { authService } from '@/lib/services/auth-client-service';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -35,31 +36,10 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        Alert.alert('خطأ في تسجيل الدخول', data.error || 'حدث خطأ ما');
-        return;
-      }
-
-      // حفظ التوكن
-      if (data.token) {
-        // TODO: حفظ التوكن في AsyncStorage
-        router.replace('/(tabs)');
-      }
+      await authService.login({ username, password });
+      router.replace('/(tabs)');
     } catch (error) {
-      Alert.alert('خطأ', 'فشل الاتصال بالخادم');
+      Alert.alert('خطأ في تسجيل الدخول', error instanceof Error ? error.message : 'حدث خطأ ما');
       console.error('Login error:', error);
     } finally {
       setLoading(false);
@@ -165,7 +145,7 @@ export default function LoginScreen() {
             {/* Sign Up Link */}
             <View className="flex-row items-center justify-center">
               <Text className="text-sm text-muted">ليس لديك حساب؟ </Text>
-              <TouchableOpacity onPress={() => router.push('/signup' as any)}>
+              <TouchableOpacity onPress={() => router.replace('/signup' as any)}>
                 <Text className="text-sm font-semibold text-primary">
                   إنشاء حساب جديد
                 </Text>

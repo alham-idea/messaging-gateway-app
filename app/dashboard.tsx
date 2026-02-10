@@ -1,26 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, ActivityIndicator, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { cn } from '@/lib/utils';
-
-interface DashboardStats {
-  whatsappMessages: number;
-  smsMessages: number;
-  totalMessages: number;
-  balance: number;
-  subscriptionPlan: string;
-  subscriptionStatus: string;
-  messagesRemaining: number;
-}
-
-interface Payment {
-  id: number;
-  amount: number;
-  date: string;
-  status: 'completed' | 'pending' | 'failed';
-  description: string;
-}
+import { dashboardService, DashboardStats, Payment } from '@/lib/services/dashboard-client-service';
 
 export default function DashboardScreen() {
   const colors = useColors();
@@ -35,27 +18,15 @@ export default function DashboardScreen() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      // TODO: استخدام التوكن المحفوظ
-      const [statsRes, paymentsRes] = await Promise.all([
-        fetch('http://localhost:3000/api/dashboard/stats', {
-          headers: { 'Authorization': 'Bearer YOUR_TOKEN_HERE' },
-        }),
-        fetch('http://localhost:3000/api/dashboard/payments', {
-          headers: { 'Authorization': 'Bearer YOUR_TOKEN_HERE' },
-        }),
+      const [statsData, paymentsData] = await Promise.all([
+        dashboardService.getStats(),
+        dashboardService.getPayments(5),
       ]);
-
-      if (statsRes.ok) {
-        const statsData = await statsRes.json();
-        setStats(statsData);
-      }
-
-      if (paymentsRes.ok) {
-        const paymentsData = await paymentsRes.json();
-        setPayments(paymentsData);
-      }
+      setStats(statsData);
+      setPayments(paymentsData);
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
+      Alert.alert('خطأ', 'فشل تحميل بيانات لوحة التحكم');
     } finally {
       setLoading(false);
     }
@@ -240,12 +211,18 @@ export default function DashboardScreen() {
 
             {/* Action Buttons */}
             <View className="gap-3">
-              <TouchableOpacity className="bg-primary rounded-lg py-3 items-center">
+              <TouchableOpacity
+                onPress={() => Alert.alert('إضافة رصيد', 'سيتم ربط بوابات الدفع قريباً')}
+                className="bg-primary rounded-lg py-3 items-center"
+              >
                 <Text className="text-background font-semibold">
                   إضافة رصيد
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity className="bg-surface border border-border rounded-lg py-3 items-center">
+              <TouchableOpacity
+                onPress={() => Alert.alert('ترقية الباقة', 'سيتم عرض الباقات قريباً')}
+                className="bg-surface border border-border rounded-lg py-3 items-center"
+              >
                 <Text className="text-foreground font-semibold">
                   ترقية الباقة
                 </Text>

@@ -2,6 +2,7 @@ import { ScrollView, View, Text, Pressable, ActivityIndicator, FlatList } from "
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
+import { ScreenHeader } from "@/components/screen-header";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
 
@@ -120,17 +121,13 @@ export default function InvoicesScreen() {
 
   return (
     <ScreenContainer className="flex-1 bg-background">
+      <ScreenHeader
+        title="الفواتير"
+        subtitle="عرض جميع فواتيرك"
+        showBackButton={true}
+      />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="flex-1 p-4">
-          {/* Header */}
-          <View className="mb-6">
-            <Text className="text-3xl font-bold text-foreground mb-2">
-              الفواتير
-            </Text>
-            <Text className="text-base text-muted">
-              عرض جميع فواتيرك
-            </Text>
-          </View>
 
           {/* Status Filter */}
           <ScrollView

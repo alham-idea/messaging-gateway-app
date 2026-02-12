@@ -2,6 +2,7 @@ import { ScrollView, View, Text, Pressable, ActivityIndicator } from "react-nati
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
+import { ScreenHeader } from "@/components/screen-header";
 import { PaymentCard } from "@/components/payment-card";
 import { useColors } from "@/hooks/use-colors";
 import { trpc } from "@/lib/trpc";
@@ -37,17 +38,13 @@ export default function PaymentMethodsScreen() {
 
   return (
     <ScreenContainer className="flex-1 bg-background">
+      <ScreenHeader
+        title="طرق الدفع"
+        subtitle="إدارة طرق الدفع الخاصة بك"
+        showBackButton={true}
+      />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
         <View className="flex-1 p-4">
-          {/* Header */}
-          <View className="mb-6">
-            <Text className="text-3xl font-bold text-foreground mb-2">
-              طرق الدفع
-            </Text>
-            <Text className="text-base text-muted">
-              إدارة طرق الدفع الخاصة بك
-            </Text>
-          </View>
 
           {/* Loading State */}
           {loading && (

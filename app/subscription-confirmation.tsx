@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { ScreenHeader } from "@/components/screen-header";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { useSubscriptions } from "@/hooks/use-subscriptions";
@@ -49,15 +50,13 @@ export default function SubscriptionConfirmationScreen() {
     : [];
 
   return (
-    <ScreenContainer className="p-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View className="mb-8">
-          <Text className="text-3xl font-bold text-foreground mb-2">تأكيد الاشتراك</Text>
-          <Text className="text-base text-muted">
-            يرجى مراجعة تفاصيل الاشتراك قبل التأكيد
-          </Text>
-        </View>
+    <ScreenContainer className="flex-1">
+      <ScreenHeader
+        title="تأكيد الاشتراك"
+        subtitle="يرجى مراجعة تفاصيل الاشتراك قبل التأكيد"
+        showBackButton={true}
+      />
+      <ScrollView showsVerticalScrollIndicator={false} className="p-4">
 
         {/* Summary Card */}
         <View className="bg-surface rounded-2xl p-6 mb-8 border border-border">

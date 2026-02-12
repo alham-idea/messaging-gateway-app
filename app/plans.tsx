@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { ScreenHeader } from "@/components/screen-header";
 import { PlanCard } from "@/components/plan-card";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
@@ -32,15 +33,13 @@ export default function PlansScreen() {
   }
 
   return (
-    <ScreenContainer className="p-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View className="mb-6">
-          <Text className="text-3xl font-bold text-foreground mb-2">اختر باقتك</Text>
-          <Text className="text-base text-muted">
-            اختر الباقة المناسبة لاحتياجاتك
-          </Text>
-        </View>
+    <ScreenContainer className="flex-1">
+      <ScreenHeader
+        title="اختر باقتك"
+        subtitle="اختر الباقة المناسبة لاحتياجاتك"
+        showBackButton={true}
+      />
+      <ScrollView showsVerticalScrollIndicator={false} className="p-4">
 
         {/* Billing Cycle Toggle */}
         <View className="flex-row bg-surface rounded-lg p-1 mb-8">

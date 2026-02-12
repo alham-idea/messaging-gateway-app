@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
+import { ScreenHeader } from "@/components/screen-header";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
 import { useSubscriptions } from "@/hooks/use-subscriptions";
@@ -68,15 +69,13 @@ export default function ManageSubscriptionScreen() {
   const smsPercentage = (usageStats.usage.smsUsed / usageStats.usage.smsLimit) * 100;
 
   return (
-    <ScreenContainer className="p-4">
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View className="mb-6">
-          <Text className="text-3xl font-bold text-foreground mb-2">إدارة الاشتراك</Text>
-          <Text className="text-base text-muted">
-            عرض وإدارة اشتراكك الحالي
-          </Text>
-        </View>
+    <ScreenContainer className="flex-1">
+      <ScreenHeader
+        title="إدارة الاشتراك"
+        subtitle="عرض وإدارة اشتراكك الحالي"
+        showBackButton={true}
+      />
+      <ScrollView showsVerticalScrollIndicator={false} className="p-4">
 
         {/* Current Plan Card */}
         <View className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-2xl p-6 mb-6 border border-primary/20">

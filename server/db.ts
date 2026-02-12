@@ -539,3 +539,150 @@ export async function updateInvoiceStatus(id: number, status: string) {
   await db.update(invoices).set(updateData).where(eq(invoices.id, id));
   return getInvoiceById(id);
 }
+
+
+/**
+ * Invoice Generation Functions
+ */
+
+/**
+ * توليد رقم فاتورة فريد
+ */
+function generateInvoiceNumber(): string {
+  const timestamp = Date.now().toString().slice(-8);
+  const random = Math.random().toString(36).substring(2, 7).toUpperCase();
+  return `INV-${timestamp}-${random}`;
+}
+
+/**
+ * إنشاء فاتورة جديدة تلقائياً
+ */
+export async function createInvoiceForSubscription(
+  userId: number,
+  subscriptionId: number
+): Promise<string | null> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    // جلب بيانات الاشتراك
+    const subscription = await db.query.userSubscriptions.findFirst({
+      where: eq(userSubscriptions.id, subscriptionId),
+    });
+
+    if (!subscription) {
+      console.error(`Subscription not found: ${subscriptionId}`);
+      return null;
+    }
+
+    // جلب بيانات الخطة
+    const plan = await db.query.subscriptionPlans.findFirst({
+      where: eq(subscriptionPlans.id, subscription.planId),
+    });
+
+    if (!plan) {
+      console.error(`Plan not found: ${subscription.planId}`);
+      return null;
+    }
+
+    // توليد رقم الفاتورة
+    const invoiceNumber = generateInvoiceNumber();
+    const now = new Date();
+    const dueDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 يوم
+    const billingPeriodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const billingPeriodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+    // حساب المبلغ والضريبة
+    const amount = parseFloat(plan.monthlyPrice.toString());
+    const taxAmount = amount * 0.15; // 15% ضريبة
+    const totalAmount = amount + taxAmount;
+
+    // إنشاء الفاتورة
+    await db.insert(invoices).values({
+      userId,
+      invoiceNumber,
+      amount: amount.toString(),
+      taxAmount: taxAmount.toString(),
+      totalAmount: totalAmount.toString(),
+      currency: "SAR",
+      invoiceStatus: "issued",
+      billingPeriodStart,
+      billingPeriodEnd,
+      dueDate,
+      notes: `اشتراك ${plan.name} - ${plan.description}`,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    console.log(`Invoice created: ${invoiceNumber}`);
+    return invoiceNumber;
+  } catch (error) {
+    console.error("Error creating invoice:", error);
+    return null;
+  }
+}
+
+/**
+ * إنشاء فواتير لجميع الاشتراكات النشطة
+ */
+export async function createMonthlyInvoices(): Promise<number> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    const subscriptions = await db.query.userSubscriptions.findMany({
+      where: eq(userSubscriptions.status, "active"),
+    });
+
+    let count = 0;
+    for (const subscription of subscriptions) {
+      const result = await createInvoiceForSubscription(
+        subscription.userId,
+        subscription.id
+      );
+      if (result) {
+        count++;
+      }
+    }
+
+    console.log(`Created ${count} invoices`);
+    return count;
+  } catch (error) {
+    console.error("Error creating monthly invoices:", error);
+    return 0;
+  }
+}
+
+/**
+ * جلب الفواتير المعلقة
+ */
+export async function getPendingInvoices(): Promise<any[]> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    return await db.query.invoices.findMany({
+      where: eq(invoices.invoiceStatus, "issued"),
+    });
+  } catch (error) {
+    console.error("Error getting pending invoices:", error);
+    return [];
+  }
+}
+
+/**
+ * جلب الفواتير المتأخرة
+ */
+export async function getOverdueInvoices(): Promise<any[]> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    return await db.query.invoices.findMany({
+      where: eq(invoices.invoiceStatus, "overdue"),
+    });
+  } catch (error) {
+    console.error("Error getting overdue invoices:", error);
+    return [];
+  }
+}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ScrollView,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
+import { ScreenHeader } from '@/components/screen-header';
 import { useRouter } from 'expo-router';
 import { useSettings } from '@/hooks/use-settings';
 import { SettingsInput } from '@/components/settings-input';
@@ -70,20 +71,14 @@ export default function SettingsScreen() {
   ];
 
   return (
-    <ScreenContainer className="bg-background">
+    <ScreenContainer className="flex-1">
+      <ScreenHeader
+        title="إعدادات التطبيق الشاملة"
+        subtitle="تخصيص جميع إعدادات الاتصال والرسائل والإشعارات"
+        showBackButton={true}
+      />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="px-4 py-4">
         <View className="gap-4">
-          {/* رأس الشاشة */}
-          <View className="flex-row items-center justify-between mb-2">
-            <Text className="text-2xl font-bold text-foreground">الإعدادات</Text>
-            <TouchableOpacity
-              onPress={() => router.back()}
-              className="bg-surface border border-border rounded-lg p-2"
-            >
-              <Text className="text-foreground text-lg">✕</Text>
-            </TouchableOpacity>
-          </View>
-
           {/* التبويبات */}
           <ScrollView
             horizontal
@@ -161,7 +156,7 @@ export default function SettingsScreen() {
             <View className="gap-4">
               <SettingsInput
                 label="تفعيل التأخير العشوائي"
-                description="إضافة تأخير عشوائي بين الرسالل"
+                description="إضافة تأخير عشوائي بين الرسائل"
                 type="toggle"
                 value={settings.enableRandomDelay}
                 onValueChange={(value) =>
@@ -331,6 +326,13 @@ export default function SettingsScreen() {
               className="bg-primary/10 border border-primary rounded-lg py-3 items-center"
             >
               <Text className="text-primary font-semibold">التحقق من الإعدادات</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push('/app-settings')}
+              className="bg-primary rounded-lg py-3 items-center"
+            >
+              <Text className="text-background font-semibold">إعدادات أخرى</Text>
             </TouchableOpacity>
 
             <TouchableOpacity

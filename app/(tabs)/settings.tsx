@@ -19,9 +19,9 @@ export default function SettingsScreen() {
     {
       id: "1",
       title: "إعدادات التطبيق",
-      description: "تخصيص إعدادات التطبيق والتطبيق",
+      description: "تخصيص إعدادات التطبيق والاتصال",
       icon: "⚙️",
-      route: "/app-settings",
+      route: "/settings",
     },
     {
       id: "2",

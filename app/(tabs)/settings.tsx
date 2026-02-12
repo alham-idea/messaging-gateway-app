@@ -18,10 +18,10 @@ export default function SettingsScreen() {
   const settingOptions: SettingOption[] = [
     {
       id: "1",
-      title: "الإعدادات",
-      description: "تخصيص إعدادات التطبيق",
+      title: "إعدادات التطبيق",
+      description: "تخصيص إعدادات التطبيق والتطبيق",
       icon: "⚙️",
-      route: "/settings",
+      route: "/app-settings",
     },
     {
       id: "2",

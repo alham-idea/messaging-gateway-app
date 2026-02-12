@@ -157,6 +157,10 @@ export const coupons = mysqlTable("coupons", {
   discountValue: decimal("discountValue", { precision: 10, scale: 2 }).notNull(),
   maxUses: int("maxUses"),
   currentUses: int("currentUses").default(0).notNull(),
+  minAmount: decimal("minAmount", { precision: 10, scale: 2 }),
+  maxAmount: decimal("maxAmount", { precision: 10, scale: 2 }),
+  validFrom: datetime("validFrom"),
+  validUntil: datetime("validUntil"),
   expiryDate: datetime("expiryDate"),
   isActive: boolean("isActive").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -183,3 +187,73 @@ export const adminUsers = mysqlTable("adminUsers", {
 
 export type AdminUser = typeof adminUsers.$inferSelect;
 export type InsertAdminUser = typeof adminUsers.$inferInsert;
+
+/**
+ * Payment methods table for storing user payment methods
+ */
+export const paymentMethods = mysqlTable("paymentMethods", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  methodType: mysqlEnum("methodType", ["credit_card", "debit_card", "bank_account", "wallet"]).notNull(),
+  isDefault: boolean("isDefault").default(false).notNull(),
+  stripePaymentMethodId: varchar("stripePaymentMethodId", { length: 255 }),
+  last4: varchar("last4", { length: 4 }),
+  expiryMonth: int("expiryMonth"),
+  expiryYear: int("expiryYear"),
+  cardBrand: varchar("cardBrand", { length: 50 }),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PaymentMethod = typeof paymentMethods.$inferSelect;
+export type InsertPaymentMethod = typeof paymentMethods.$inferInsert;
+
+/**
+ * Refunds table for tracking refund transactions
+ */
+export const refunds = mysqlTable("refunds", {
+  id: int("id").autoincrement().primaryKey(),
+  paymentId: int("paymentId").notNull(),
+  userId: int("userId").notNull(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason"),
+  refundStatus: mysqlEnum("refundStatus", ["pending", "completed", "failed"]).default("pending").notNull(),
+  stripeRefundId: varchar("stripeRefundId", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Refund = typeof refunds.$inferSelect;
+export type InsertRefund = typeof refunds.$inferInsert;
+
+/**
+ * Invoices items table for detailed invoice line items
+ */
+export const invoiceItems = mysqlTable("invoiceItems", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").notNull(),
+  description: text("description").notNull(),
+  quantity: int("quantity").default(1).notNull(),
+  unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).notNull(),
+  totalPrice: decimal("totalPrice", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InvoiceItem = typeof invoiceItems.$inferSelect;
+export type InsertInvoiceItem = typeof invoiceItems.$inferInsert;
+
+/**
+ * User coupon usage table
+ */
+export const userCouponUsage = mysqlTable("userCouponUsage", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  couponId: int("couponId").notNull(),
+  invoiceId: int("invoiceId"),
+  discountAmount: decimal("discountAmount", { precision: 10, scale: 2 }).notNull(),
+  usedAt: timestamp("usedAt").defaultNow().notNull(),
+});
+
+export type UserCouponUsage = typeof userCouponUsage.$inferSelect;
+export type InsertUserCouponUsage = typeof userCouponUsage.$inferInsert;

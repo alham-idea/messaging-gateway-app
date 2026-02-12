@@ -1,6 +1,6 @@
-import { eq, and } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers, userSubscriptions, subscriptionHistory } from "../drizzle/schema";
+import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers, userSubscriptions, subscriptionHistory, paymentMethods, refunds } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import * as bcrypt from "bcrypt";
 
@@ -253,11 +253,19 @@ export async function updatePaymentStatus(id: number, status: "pending" | "compl
   await db.update(payments).set(updates).where(eq(payments.id, id));
 }
 
-export async function getUserPayments(userId: number) {
+export async function getUserPayments(userId: number, limit: number = 10, offset: number = 0) {
   const db = await getDb();
   if (!db) return [];
 
-  return db.select().from(payments).where(eq(payments.userId, userId));
+  return db.select().from(payments).where(eq(payments.userId, userId)).orderBy(desc(payments.createdAt)).limit(limit).offset(offset);
+}
+
+export async function getPaymentById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(payments).where(eq(payments.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
 
 /**
@@ -414,4 +422,120 @@ export async function getAdminUserByUsername(username: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add more feature queries as your schema grows.
+
+/**
+ * Payment Method Functions
+ */
+
+export async function addPaymentMethod(methodData: {
+  userId: number;
+  methodType: string;
+  last4?: string;
+  cardBrand?: string;
+  expiryMonth?: number;
+  expiryYear?: number;
+  isDefault: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  // If this is the default, unset other defaults
+  if (methodData.isDefault) {
+    await db.update(paymentMethods).set({ isDefault: false }).where(eq(paymentMethods.userId, methodData.userId));
+  }
+
+  await db.insert(paymentMethods).values({
+    userId: methodData.userId,
+    methodType: methodData.methodType as any,
+    last4: methodData.last4,
+    cardBrand: methodData.cardBrand,
+    expiryMonth: methodData.expiryMonth,
+    expiryYear: methodData.expiryYear,
+    isDefault: methodData.isDefault,
+  });
+
+  const userMethods = await getUserPaymentMethods(methodData.userId);
+  const lastMethod = userMethods[userMethods.length - 1];
+  return lastMethod;
+}
+
+export async function getPaymentMethodById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(paymentMethods).where(eq(paymentMethods.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getUserPaymentMethods(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(paymentMethods).where(and(eq(paymentMethods.userId, userId), eq(paymentMethods.isActive, true)));
+}
+
+export async function deletePaymentMethod(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(paymentMethods).set({ isActive: false }).where(eq(paymentMethods.id, id));
+}
+
+/**
+ * Refund Functions
+ */
+
+export async function createRefund(refundData: {
+  paymentId: number;
+  userId: number;
+  amount: string | number;
+  reason?: string;
+  refundStatus: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(refunds).values({
+    paymentId: refundData.paymentId,
+    userId: refundData.userId,
+    amount: refundData.amount.toString(),
+    reason: refundData.reason,
+    refundStatus: refundData.refundStatus as any,
+  });
+
+  const userRefunds = await db.select().from(refunds).where(eq(refunds.userId, refundData.userId)).orderBy(desc(refunds.id)).limit(1);
+  return userRefunds[0];
+}
+
+export async function getRefundById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(refunds).where(eq(refunds.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Invoice Functions (Additional)
+ */
+
+export async function getInvoiceById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateInvoiceStatus(id: number, status: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const updateData: any = { invoiceStatus: status };
+  if (status === "paid") {
+    updateData.paidDate = new Date();
+  }
+
+  await db.update(invoices).set(updateData).where(eq(invoices.id, id));
+  return getInvoiceById(id);
+}

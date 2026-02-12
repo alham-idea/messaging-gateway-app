@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { authRouter } from "./routers/auth";
 import { subscriptionsRouter } from "./routers/subscriptions";
+import { paymentsRouter } from "./routers/payments";
 import * as db from "./db";
 
 
@@ -63,6 +64,7 @@ export const appRouter = router({
   system: systemRouter,
   auth: authRouter,
   subscriptions: subscriptionsRouter,
+  payments: paymentsRouter,
 });
 
 export type AppRouter = typeof appRouter;

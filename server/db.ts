@@ -1,6 +1,6 @@
 import { eq, desc, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers, userSubscriptions, subscriptionHistory, paymentMethods, refunds } from "../drizzle/schema";
+import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers, userSubscriptions, subscriptionHistory, paymentMethods, refunds, notifications, notificationPreferences, emailQueue, notificationHistory } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import * as bcrypt from "bcrypt";
 
@@ -684,5 +684,297 @@ export async function getOverdueInvoices(): Promise<any[]> {
   } catch (error) {
     console.error("Error getting overdue invoices:", error);
     return [];
+  }
+}
+
+
+/**
+ * Notification Management Functions
+ */
+
+export async function createNotification(
+  userId: number,
+  data: {
+    type: string;
+    title: string;
+    message: string;
+    priority?: string;
+    actionUrl?: string;
+    relatedEntityType?: string;
+    relatedEntityId?: number;
+  }
+): Promise<any> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    await db.insert(notifications).values({
+      userId,
+      type: data.type as any,
+      title: data.title,
+      message: data.message,
+      priority: (data.priority || "normal") as any,
+      actionUrl: data.actionUrl,
+      relatedEntityType: data.relatedEntityType,
+      relatedEntityId: data.relatedEntityId,
+      isRead: false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error creating notification:", error);
+    throw error;
+  }
+}
+
+export async function getNotifications(
+  userId: number,
+  options: {
+    limit?: number;
+    offset?: number;
+    unreadOnly?: boolean;
+    type?: string;
+  } = {}
+): Promise<any[]> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    const conditions = [eq(notifications.userId, userId)];
+    if (options.unreadOnly) {
+      conditions.push(eq(notifications.isRead, false));
+    }
+    if (options.type) {
+      conditions.push(eq(notifications.type, options.type as any));
+    }
+
+    return await db
+      .select()
+      .from(notifications)
+      .where(and(...conditions))
+      .orderBy(desc(notifications.createdAt))
+      .limit(options.limit || 20)
+      .offset(options.offset || 0);
+  } catch (error) {
+    console.error("Error getting notifications:", error);
+    return [];
+  }
+}
+
+export async function markNotificationAsRead(
+  notificationId: number,
+  userId: number
+): Promise<any> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    await db
+      .update(notifications)
+      .set({
+        isRead: true,
+        readAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error marking notification as read:", error);
+    throw error;
+  }
+}
+
+export async function markAllNotificationsAsRead(userId: number): Promise<any> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    await db
+      .update(notifications)
+      .set({
+        isRead: true,
+        readAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(notifications.userId, userId));
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error marking all notifications as read:", error);
+    throw error;
+  }
+}
+
+export async function deleteNotification(
+  notificationId: number,
+  userId: number
+): Promise<any> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    await db
+      .delete(notifications)
+      .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting notification:", error);
+    throw error;
+  }
+}
+
+export async function getUnreadNotificationCount(userId: number): Promise<number> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    const result = await db
+      .select()
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), eq(notifications.isRead, false)));
+
+    return result.length;
+  } catch (error) {
+    console.error("Error getting unread notification count:", error);
+    return 0;
+  }
+}
+
+export async function getNotificationPreferences(userId: number): Promise<any> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    const prefs = await db
+      .select()
+      .from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+
+    return prefs[0] || null;
+  } catch (error) {
+    console.error("Error getting notification preferences:", error);
+    return null;
+  }
+}
+
+export async function updateNotificationPreferences(
+  userId: number,
+  data: Record<string, any>
+): Promise<any> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    const existing = await getNotificationPreferences(userId);
+
+    if (existing) {
+      await db
+        .update(notificationPreferences)
+        .set({
+          ...data,
+          updatedAt: new Date(),
+        })
+        .where(eq(notificationPreferences.userId, userId));
+    } else {
+      await db.insert(notificationPreferences).values({
+        userId,
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating notification preferences:", error);
+    throw error;
+  }
+}
+
+export async function createEmailQueueItem(data: {
+  userId: number;
+  recipientEmail: string;
+  subject: string;
+  htmlContent: string;
+  textContent?: string;
+  notificationType?: string;
+}): Promise<any> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    await db.insert(emailQueue).values({
+      userId: data.userId,
+      recipientEmail: data.recipientEmail,
+      subject: data.subject,
+      htmlContent: data.htmlContent,
+      textContent: data.textContent,
+      notificationType: data.notificationType,
+      status: "pending",
+      retryCount: 0,
+      maxRetries: 3,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error creating email queue item:", error);
+    throw error;
+  }
+}
+
+export async function getEmailQueue(options: {
+  limit?: number;
+  status?: string;
+}): Promise<any[]> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    if (options.status) {
+      return await db
+        .select()
+        .from(emailQueue)
+        .where(eq(emailQueue.status, options.status as any))
+        .orderBy(desc(emailQueue.createdAt))
+        .limit(options.limit || 50);
+    }
+
+    return await db
+      .select()
+      .from(emailQueue)
+      .orderBy(desc(emailQueue.createdAt))
+      .limit(options.limit || 50);
+  } catch (error) {
+    console.error("Error getting email queue:", error);
+    return [];
+  }
+}
+
+export async function updateEmailQueueStatus(
+  emailId: number,
+  status: string
+): Promise<any> {
+  try {
+    const db = await getDb();
+    if (!db) throw new Error("Database not available");
+
+    await db
+      .update(emailQueue)
+      .set({
+        status: status as any,
+        updatedAt: new Date(),
+      })
+      .where(eq(emailQueue.id, emailId));
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error updating email queue status:", error);
+    throw error;
   }
 }

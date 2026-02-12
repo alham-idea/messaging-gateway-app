@@ -257,3 +257,108 @@ export const userCouponUsage = mysqlTable("userCouponUsage", {
 
 export type UserCouponUsage = typeof userCouponUsage.$inferSelect;
 export type InsertUserCouponUsage = typeof userCouponUsage.$inferInsert;
+
+
+/**
+ * Notifications table - for storing all types of notifications
+ */
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  type: mysqlEnum("type", [
+    "subscription_expiring",
+    "subscription_expired",
+    "payment_failed",
+    "payment_success",
+    "usage_limit_warning",
+    "usage_limit_exceeded",
+    "invoice_generated",
+    "invoice_paid",
+    "coupon_applied",
+    "plan_upgraded",
+    "plan_downgraded",
+    "system_alert",
+    "promotional",
+    "support_response",
+  ]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  description: text("description"),
+  relatedEntityType: varchar("relatedEntityType", { length: 50 }), // subscription, invoice, payment, etc
+  relatedEntityId: int("relatedEntityId"),
+  isRead: boolean("isRead").default(false).notNull(),
+  readAt: timestamp("readAt"),
+  actionUrl: varchar("actionUrl", { length: 500 }),
+  priority: mysqlEnum("priority", ["low", "normal", "high", "critical"]).default("normal").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
+/**
+ * Notification Preferences table - user preferences for notifications
+ */
+export const notificationPreferences = mysqlTable("notificationPreferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  emailNotifications: boolean("emailNotifications").default(true).notNull(),
+  pushNotifications: boolean("pushNotifications").default(true).notNull(),
+  smsNotifications: boolean("smsNotifications").default(false).notNull(),
+  subscriptionAlerts: boolean("subscriptionAlerts").default(true).notNull(),
+  paymentAlerts: boolean("paymentAlerts").default(true).notNull(),
+  usageAlerts: boolean("usageAlerts").default(true).notNull(),
+  promotionalEmails: boolean("promotionalEmails").default(false).notNull(),
+  weeklyDigest: boolean("weeklyDigest").default(false).notNull(),
+  monthlyReport: boolean("monthlyReport").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type NotificationPreference = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreference = typeof notificationPreferences.$inferInsert;
+
+/**
+ * Email Queue table - for storing emails to be sent
+ */
+export const emailQueue = mysqlTable("emailQueue", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  recipientEmail: varchar("recipientEmail", { length: 320 }).notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  htmlContent: text("htmlContent").notNull(),
+  textContent: text("textContent"),
+  notificationType: varchar("notificationType", { length: 50 }),
+  relatedEntityType: varchar("relatedEntityType", { length: 50 }),
+  relatedEntityId: int("relatedEntityId"),
+  status: mysqlEnum("status", ["pending", "sent", "failed", "bounced"]).default("pending").notNull(),
+  sentAt: timestamp("sentAt"),
+  failureReason: text("failureReason"),
+  retryCount: int("retryCount").default(0).notNull(),
+  maxRetries: int("maxRetries").default(3).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type EmailQueueItem = typeof emailQueue.$inferSelect;
+export type InsertEmailQueueItem = typeof emailQueue.$inferInsert;
+
+/**
+ * Notification History table - for tracking notification delivery
+ */
+export const notificationHistory = mysqlTable("notificationHistory", {
+  id: int("id").autoincrement().primaryKey(),
+  notificationId: int("notificationId").notNull(),
+  userId: int("userId").notNull(),
+  channel: mysqlEnum("channel", ["in_app", "email", "push", "sms"]).notNull(),
+  status: mysqlEnum("status", ["pending", "sent", "delivered", "failed", "bounced"]).default("pending").notNull(),
+  sentAt: timestamp("sentAt"),
+  deliveredAt: timestamp("deliveredAt"),
+  failureReason: text("failureReason"),
+  metadata: text("metadata"), // JSON string for additional data
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type NotificationHistoryRecord = typeof notificationHistory.$inferSelect;
+export type InsertNotificationHistoryRecord = typeof notificationHistory.$inferInsert;

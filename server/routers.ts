@@ -5,6 +5,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { authRouter } from "./routers/auth";
 import { subscriptionsRouter } from "./routers/subscriptions";
 import { paymentsRouter } from "./routers/payments";
+import { notificationsRouter } from "./routers/notifications";
 import * as db from "./db";
 
 
@@ -65,6 +66,7 @@ export const appRouter = router({
   auth: authRouter,
   subscriptions: subscriptionsRouter,
   payments: paymentsRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -216,6 +216,53 @@ export default function HomeScreen() {
               <Text className="text-foreground font-semibold">الرسائل الفاشلة</Text>
             </TouchableOpacity>
 
+            {/* قسم الاشتراكات والدفع */}
+            <View className="border-t border-border pt-4 mt-2">
+              <Text className="text-lg font-semibold text-foreground mb-3">الاشتراكات والدفع</Text>
+              
+              <TouchableOpacity
+                onPress={() => router.push('/plans')}
+                className="bg-primary rounded-lg py-3 items-center mb-3"
+              >
+                <Text className="text-white font-semibold">اختيار الباقة</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/manage-subscription')}
+                className="bg-surface border border-border rounded-lg py-3 items-center mb-3"
+              >
+                <Text className="text-foreground font-semibold">إدارة الاشتراك</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/payment-methods')}
+                className="bg-surface border border-border rounded-lg py-3 items-center mb-3"
+              >
+                <Text className="text-foreground font-semibold">طرق الدفع</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/invoices')}
+                className="bg-surface border border-border rounded-lg py-3 items-center mb-3"
+              >
+                <Text className="text-foreground font-semibold">الفواتير</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/payment-history')}
+                className="bg-surface border border-border rounded-lg py-3 items-center mb-3"
+              >
+                <Text className="text-foreground font-semibold">سجل الدفعات</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => router.push('/apply-coupon')}
+                className="bg-surface border border-border rounded-lg py-3 items-center"
+              >
+                <Text className="text-foreground font-semibold">تطبيق كوبون</Text>
+              </TouchableOpacity>
+            </View>
+
             <TouchableOpacity
               disabled={isInitializing}
               onPress={handleDisconnect}

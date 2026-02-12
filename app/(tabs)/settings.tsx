@@ -21,7 +21,7 @@ export default function SettingsScreen() {
       title: "إعدادات التطبيق",
       description: "تخصيص إعدادات التطبيق والاتصال",
       icon: "⚙️",
-      route: "/settings",
+      route: "/comprehensive-settings",
     },
     {
       id: "2",

@@ -12,30 +12,14 @@ import {
 
 /**
  * Core user table for authentication and user management.
- * Extended with subscription and billing information.
  */
 export const users = mysqlTable("users", {
   id: int("id").autoincrement().primaryKey(),
-  // Business information
-  businessName: varchar("businessName", { length: 255 }).notNull(),
-  businessAddress: text("businessAddress"),
-  businessPhone: varchar("businessPhone", { length: 20 }),
-  // User credentials
-  username: varchar("username", { length: 100 }).notNull().unique(),
+  openId: varchar("openId", { length: 64 }),
+  name: text("name"),
   email: varchar("email", { length: 320 }).notNull().unique(),
-  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
-  // Subscription info
-  subscriptionPlanId: int("subscriptionPlanId").notNull(),
-  subscriptionStatus: mysqlEnum("subscriptionStatus", ["active", "inactive", "suspended", "expired"]).default("active").notNull(),
-  subscriptionStartDate: timestamp("subscriptionStartDate").defaultNow().notNull(),
-  subscriptionEndDate: timestamp("subscriptionEndDate"),
-  // Balance and usage
-  accountBalance: decimal("accountBalance", { precision: 10, scale: 2 }).default("0.00").notNull(),
-  messagesUsedWhatsapp: int("messagesUsedWhatsapp").default(0).notNull(),
-  messagesUsedSms: int("messagesUsedSms").default(0).notNull(),
-  // Status
-  isActive: boolean("isActive").default(true).notNull(),
-  // Timestamps
+  loginMethod: varchar("loginMethod", { length: 64 }),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn"),
@@ -64,6 +48,43 @@ export const subscriptionPlans = mysqlTable("subscriptionPlans", {
 
 export type SubscriptionPlan = typeof subscriptionPlans.$inferSelect;
 export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
+
+/**
+ * User subscriptions table for tracking active subscriptions
+ */
+export const userSubscriptions = mysqlTable("userSubscriptions", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  planId: int("planId").notNull(),
+  status: mysqlEnum("status", ["active", "inactive", "suspended", "expired", "cancelled"]).default("active").notNull(),
+  startDate: timestamp("startDate").defaultNow().notNull(),
+  endDate: timestamp("endDate"),
+  autoRenew: boolean("autoRenew").default(true).notNull(),
+  billingCycle: mysqlEnum("billingCycle", ["monthly", "yearly"]).default("monthly").notNull(),
+  nextBillingDate: timestamp("nextBillingDate"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserSubscription = typeof userSubscriptions.$inferSelect;
+export type InsertUserSubscription = typeof userSubscriptions.$inferInsert;
+
+/**
+ * Plan upgrade/downgrade history table
+ */
+export const subscriptionHistory = mysqlTable("subscriptionHistory", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  fromPlanId: int("fromPlanId"),
+  toPlanId: int("toPlanId").notNull(),
+  changeType: mysqlEnum("changeType", ["upgrade", "downgrade", "initial", "renewal", "cancellation"]).notNull(),
+  reason: text("reason"),
+  effectiveDate: timestamp("effectiveDate").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SubscriptionHistory = typeof subscriptionHistory.$inferSelect;
+export type InsertSubscriptionHistory = typeof subscriptionHistory.$inferInsert;
 
 /**
  * Payments table for tracking all transactions

@@ -13,26 +13,14 @@ export const authRouter = router({
   register: publicProcedure
     .input(
       z.object({
-        businessName: z.string().min(1),
-        businessAddress: z.string().optional(),
-        businessPhone: z.string().optional(),
-        username: z.string().min(3),
+        name: z.string().min(1),
         email: z.string().email(),
-        password: z.string().min(6),
-        subscriptionPlanId: z.number().default(1),
+        loginMethod: z.string().optional(),
+        planId: z.number().default(1),
       })
     )
     .mutation(async ({ input }) => {
       try {
-        // Check if user already exists
-        const existingUser = await db.getUserByUsername(input.username);
-        if (existingUser) {
-          throw new TRPCError({
-            code: "CONFLICT",
-            message: "Username already exists",
-          });
-        }
-
         const existingEmail = await db.getUserByEmail(input.email);
         if (existingEmail) {
           throw new TRPCError({
@@ -43,13 +31,17 @@ export const authRouter = router({
 
         // Create new user
         const result = await db.createUser({
-          businessName: input.businessName,
-          businessAddress: input.businessAddress,
-          businessPhone: input.businessPhone,
-          username: input.username,
+          name: input.name,
           email: input.email,
-          password: input.password,
-          subscriptionPlanId: input.subscriptionPlanId,
+          loginMethod: input.loginMethod,
+        });
+
+        // Create user subscription
+        await db.createUserSubscription({
+          userId: result.id,
+          planId: input.planId,
+          billingCycle: "monthly",
+          autoRenew: true,
         });
 
         // Generate JWT token
@@ -62,7 +54,7 @@ export const authRouter = router({
         }
 
         const token = jwt.sign(
-          { userId: user.id, username: user.username, email: user.email },
+          { userId: user.id, email: user.email },
           JWT_SECRET,
           { expiresIn: "7d" }
         );
@@ -71,8 +63,7 @@ export const authRouter = router({
           success: true,
           user: {
             id: user.id,
-            businessName: user.businessName,
-            username: user.username,
+            name: user.name,
             email: user.email,
           },
           token,
@@ -87,41 +78,58 @@ export const authRouter = router({
     }),
 
   /**
-   * Login user
+   * Login user (OAuth based)
    */
   login: publicProcedure
     .input(
       z.object({
-        username: z.string(),
-        password: z.string(),
+        email: z.string().email(),
+        name: z.string().optional(),
+        openId: z.string().optional(),
+        loginMethod: z.string(),
       })
     )
     .mutation(async ({ input }) => {
       try {
-        const user = await db.getUserByUsername(input.username);
+        let user = await db.getUserByEmail(input.email);
+        
+        // Create user if doesn't exist
+        if (!user) {
+          const result = await db.createUser({
+            name: input.name,
+            email: input.email,
+            loginMethod: input.loginMethod,
+          });
+
+          // Create default subscription
+          await db.createUserSubscription({
+            userId: result.id,
+            planId: 1, // Default plan
+            billingCycle: "monthly",
+            autoRenew: true,
+          });
+
+          user = await db.getUserById(result.id);
+        } else {
+          // Update login method if provided
+          if (input.loginMethod) {
+            await db.updateUser(user.id, {
+              loginMethod: input.loginMethod,
+              lastSignedIn: new Date(),
+            });
+          }
+        }
+
         if (!user) {
           throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Invalid username or password",
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to process login",
           });
         }
-
-        const isPasswordValid = await db.verifyPassword(input.password, user.passwordHash);
-        if (!isPasswordValid) {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Invalid username or password",
-          });
-        }
-
-        // Update last signed in
-        await db.updateUser(user.id, {
-          lastSignedIn: new Date(),
-        });
 
         // Generate JWT token
         const token = jwt.sign(
-          { userId: user.id, username: user.username, email: user.email },
+          { userId: user.id, email: user.email },
           JWT_SECRET,
           { expiresIn: "7d" }
         );
@@ -130,8 +138,7 @@ export const authRouter = router({
           success: true,
           user: {
             id: user.id,
-            businessName: user.businessName,
-            username: user.username,
+            name: user.name,
             email: user.email,
           },
           token,
@@ -157,20 +164,25 @@ export const authRouter = router({
       });
     }
 
-    const plan = await db.getSubscriptionPlan(user.subscriptionPlanId);
+    const subscription = await db.getUserSubscription(user.id);
+    const plan = subscription ? await db.getSubscriptionPlan(subscription.planId) : null;
 
     return {
       id: user.id,
-      businessName: user.businessName,
-      businessAddress: user.businessAddress,
-      businessPhone: user.businessPhone,
-      username: user.username,
+      name: user.name,
       email: user.email,
-      subscriptionStatus: user.subscriptionStatus,
-      accountBalance: user.accountBalance,
-      messagesUsedWhatsapp: user.messagesUsedWhatsapp,
-      messagesUsedSms: user.messagesUsedSms,
-      subscriptionPlan: plan,
+      loginMethod: user.loginMethod,
+      subscription: subscription ? {
+        id: subscription.id,
+        planId: subscription.planId,
+        status: subscription.status,
+        billingCycle: subscription.billingCycle,
+        startDate: subscription.startDate,
+        endDate: subscription.endDate,
+        nextBillingDate: subscription.nextBillingDate,
+        autoRenew: subscription.autoRenew,
+      } : null,
+      plan,
       createdAt: user.createdAt,
     };
   }),
@@ -181,18 +193,14 @@ export const authRouter = router({
   updateProfile: protectedProcedure
     .input(
       z.object({
-        businessName: z.string().optional(),
-        businessAddress: z.string().optional(),
-        businessPhone: z.string().optional(),
+        name: z.string().optional(),
         email: z.string().email().optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
         await db.updateUser(ctx.user.id, {
-          businessName: input.businessName,
-          businessAddress: input.businessAddress,
-          businessPhone: input.businessPhone,
+          name: input.name,
           email: input.email,
         });
 
@@ -201,8 +209,7 @@ export const authRouter = router({
           success: true,
           user: {
             id: user!.id,
-            businessName: user!.businessName,
-            username: user!.username,
+            name: user!.name,
             email: user!.email,
           },
         };
@@ -215,50 +222,64 @@ export const authRouter = router({
     }),
 
   /**
-   * Change password
+   * Logout user
    */
-  changePassword: protectedProcedure
+  logout: publicProcedure.mutation(({ ctx }) => {
+    // TODO: Implement logout with cookie clearing
+    return {
+      success: true,
+    };
+  }),
+
+  /**
+   * Get all subscription plans
+   */
+  getPlans: publicProcedure.query(async () => {
+    const plans = await db.getAllSubscriptionPlans();
+    return plans;
+  }),
+
+  /**
+   * Upgrade subscription
+   */
+  upgradeSubscription: protectedProcedure
     .input(
       z.object({
-        currentPassword: z.string(),
-        newPassword: z.string().min(6),
+        newPlanId: z.number(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       try {
-        const user = await db.getUserById(ctx.user.id);
-        if (!user) {
+        const currentSubscription = await db.getUserSubscription(ctx.user.id);
+        if (!currentSubscription) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: "User not found",
+            message: "User has no active subscription",
           });
         }
 
-        const isPasswordValid = await db.verifyPassword(input.currentPassword, user.passwordHash);
-        if (!isPasswordValid) {
+        const newPlan = await db.getSubscriptionPlan(input.newPlanId);
+        if (!newPlan) {
           throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Current password is incorrect",
+            code: "NOT_FOUND",
+            message: "Plan not found",
           });
         }
 
-        // Hash new password and update
-        const bcrypt = await import("bcrypt");
-        const newPasswordHash = await bcrypt.hash(input.newPassword, 10);
+        const currentPlan = await db.getSubscriptionPlan(currentSubscription.planId);
+        const changeType = currentPlan && newPlan.monthlyPrice > currentPlan.monthlyPrice ? "upgrade" : "downgrade";
 
-        await db.updateUser(ctx.user.id, {
-          passwordHash: newPasswordHash,
-        });
+        await db.upgradeSubscription(ctx.user.id, input.newPlanId, changeType);
 
         return {
           success: true,
-          message: "Password changed successfully",
+          message: `Successfully ${changeType}d to ${newPlan.name}`,
         };
       } catch (error) {
         if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to change password",
+          message: "Failed to upgrade subscription",
         });
       }
     }),

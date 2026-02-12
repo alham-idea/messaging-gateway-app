@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers } from "../drizzle/schema";
+import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers, userSubscriptions, subscriptionHistory } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import * as bcrypt from "bcrypt";
 
@@ -24,48 +24,25 @@ export async function getDb() {
  */
 
 export async function createUser(userData: {
-  businessName: string;
-  businessAddress?: string;
-  businessPhone?: string;
-  username: string;
+  name?: string;
   email: string;
-  password: string;
-  subscriptionPlanId: number;
+  loginMethod?: string;
 }): Promise<{ id: number }> {
   const db = await getDb();
   if (!db) {
     throw new Error("Database not available");
   }
 
-  const passwordHash = await bcrypt.hash(userData.password, 10);
-
   const result = await db.insert(users).values({
-    businessName: userData.businessName,
-    businessAddress: userData.businessAddress,
-    businessPhone: userData.businessPhone,
-    username: userData.username,
+    name: userData.name,
     email: userData.email,
-    passwordHash,
-    subscriptionPlanId: userData.subscriptionPlanId,
-    subscriptionStatus: "active",
-    accountBalance: "0.00",
-    isActive: true,
+    loginMethod: userData.loginMethod,
+    role: "user",
   });
 
-  const insertedUser = await getUserByUsername(userData.username);
+  const insertedUser = await getUserByEmail(userData.email);
   if (!insertedUser) throw new Error("Failed to create user");
   return { id: insertedUser.id };
-}
-
-export async function getUserByUsername(username: string) {
-  const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
-  const result = await db.select().from(users).where(eq(users.username, username)).limit(1);
-  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function getUserByEmail(email: string) {
@@ -104,7 +81,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 }
 
 /**
- * Subscription Functions
+ * Subscription Plan Functions
  */
 
 export async function getSubscriptionPlan(id: number) {
@@ -120,6 +97,122 @@ export async function getAllSubscriptionPlans() {
   if (!db) return [];
 
   return db.select().from(subscriptionPlans).where(eq(subscriptionPlans.isActive, true));
+}
+
+export async function createSubscriptionPlan(planData: {
+  name: string;
+  description?: string;
+  monthlyPrice: string;
+  yearlyPrice?: string;
+  whatsappMessagesLimit: number;
+  smsMessagesLimit: number;
+  supportLevel: "basic" | "standard" | "premium";
+  features?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.insert(subscriptionPlans).values({
+    name: planData.name,
+    description: planData.description,
+    monthlyPrice: planData.monthlyPrice,
+    yearlyPrice: planData.yearlyPrice,
+    whatsappMessagesLimit: planData.whatsappMessagesLimit,
+    smsMessagesLimit: planData.smsMessagesLimit,
+    supportLevel: planData.supportLevel,
+    features: planData.features,
+    isActive: true,
+  });
+
+  const plans = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.name, planData.name));
+  return { id: plans[plans.length - 1]?.id || 0 };
+}
+
+/**
+ * User Subscription Functions
+ */
+
+export async function createUserSubscription(subscriptionData: {
+  userId: number;
+  planId: number;
+  billingCycle: "monthly" | "yearly";
+  autoRenew?: boolean;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const endDate = new Date();
+  if (subscriptionData.billingCycle === "monthly") {
+    endDate.setMonth(endDate.getMonth() + 1);
+  } else {
+    endDate.setFullYear(endDate.getFullYear() + 1);
+  }
+
+  const nextBillingDate = new Date(endDate);
+
+  await db.insert(userSubscriptions).values({
+    userId: subscriptionData.userId,
+    planId: subscriptionData.planId,
+    status: "active",
+    billingCycle: subscriptionData.billingCycle,
+    autoRenew: subscriptionData.autoRenew ?? true,
+    endDate,
+    nextBillingDate,
+  });
+
+  const subscriptions = await db.select().from(userSubscriptions).where(eq(userSubscriptions.userId, subscriptionData.userId));
+  return { id: subscriptions[subscriptions.length - 1]?.id || 0 };
+}
+
+export async function getUserSubscription(userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(userSubscriptions)
+    .where(and(
+      eq(userSubscriptions.userId, userId),
+      eq(userSubscriptions.status, "active")
+    ))
+    .limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function updateUserSubscription(id: number, updates: any) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  await db.update(userSubscriptions).set(updates).where(eq(userSubscriptions.id, id));
+}
+
+export async function upgradeSubscription(userId: number, newPlanId: number, changeType: "upgrade" | "downgrade") {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const currentSubscription = await getUserSubscription(userId);
+  if (!currentSubscription) throw new Error("User has no active subscription");
+
+  // Record history
+  await db.insert(subscriptionHistory).values({
+    userId,
+    fromPlanId: currentSubscription.planId,
+    toPlanId: newPlanId,
+    changeType,
+  });
+
+  // Update subscription
+  const endDate = new Date();
+  if (currentSubscription.billingCycle === "monthly") {
+    endDate.setMonth(endDate.getMonth() + 1);
+  } else {
+    endDate.setFullYear(endDate.getFullYear() + 1);
+  }
+
+  await updateUserSubscription(currentSubscription.id, {
+    planId: newPlanId,
+    endDate,
+    nextBillingDate: endDate,
+  });
 }
 
 /**

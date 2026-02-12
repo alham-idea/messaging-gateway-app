@@ -6,6 +6,7 @@ import { authRouter } from "./routers/auth";
 import { subscriptionsRouter } from "./routers/subscriptions";
 import { paymentsRouter } from "./routers/payments";
 import { notificationsRouter } from "./routers/notifications";
+import { adminRouter } from "./routers/admin";
 import * as db from "./db";
 
 
@@ -67,6 +68,7 @@ export const appRouter = router({
   subscriptions: subscriptionsRouter,
   payments: paymentsRouter,
   notifications: notificationsRouter,
+  admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;

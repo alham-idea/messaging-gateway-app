@@ -978,3 +978,51 @@ export async function updateEmailQueueStatus(
     throw error;
   }
 }
+
+
+/**
+ * Admin Helper Functions
+ */
+
+export async function getAllUsers() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(users);
+}
+
+export async function getAllActiveSubscriptions() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(userSubscriptions).where(eq(userSubscriptions.status, "active"));
+}
+
+export async function getAllPayments() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(payments).orderBy(desc(payments.createdAt));
+}
+
+export async function getAllInvoices() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(invoices).orderBy(desc(invoices.createdAt));
+}
+
+export async function getSubscriptionById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+
+  const result = await db.select().from(userSubscriptions).where(eq(userSubscriptions.id, id)).limit(1);
+  return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getAllUsageStatistics() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(usageStatistics).orderBy(desc(usageStatistics.date));
+}

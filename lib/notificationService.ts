@@ -6,8 +6,8 @@ import { trpc } from './trpc';
  */
 
 export interface Notification {
-  id: string | number;
-  type: string;
+  id: string;
+  type: 'user_created' | 'subscription_changed' | 'payment_received' | 'payment_failed' | 'invoice_issued' | 'invoice_overdue';
   title: string;
   message: string;
   timestamp: Date;

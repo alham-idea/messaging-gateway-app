@@ -102,7 +102,7 @@ export const rateLimitMiddleware = rateLimit({
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true, // Return rate limit info in `RateLimit-*` headers
   legacyHeaders: false, // Disable `X-RateLimit-*` headers
-  skip: (req) => {
+  skip: (req: Request) => {
     // Skip rate limiting for health check
     return req.path === '/health';
   },

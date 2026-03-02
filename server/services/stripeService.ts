@@ -4,7 +4,7 @@ import { payments, invoices, users } from '../../drizzle/schema';
 import { eq } from 'drizzle-orm';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
+  // Remove apiVersion to use default latest version
 });
 
 /**
@@ -175,7 +175,7 @@ export class StripeService {
    */
   async cancelSubscription(subscriptionId: string): Promise<boolean> {
     try {
-      await stripe.subscriptions.del(subscriptionId);
+      await stripe.subscriptions.cancel(subscriptionId);
       return true;
     } catch (error) {
       console.error('Error canceling subscription:', error);

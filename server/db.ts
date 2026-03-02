@@ -566,21 +566,22 @@ export async function createInvoiceForSubscription(
     if (!db) throw new Error("Database not available");
 
     // جلب بيانات الاشتراك
-    const subscription = await db.query.userSubscriptions.findFirst({
-      where: eq(userSubscriptions.id, subscriptionId),
-    });
+    const subscription = await db
+      .select()
+      .from(userSubscriptions)
+      .where(eq(userSubscriptions.id, subscriptionId))
+      .limit(1);
+    
+    if (!subscription || subscription.length === 0) return null;
 
-    if (!subscription) {
-      console.error(`Subscription not found: ${subscriptionId}`);
-      return null;
-    }
+    const sub = subscription[0];
 
     // جلب بيانات الخطة
-    const planResult = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, subscription.planId)).limit(1);
+    const planResult = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, sub.planId)).limit(1);
     const plan = planResult.length > 0 ? planResult[0] : null;
 
     if (!plan) {
-      console.error(`Plan not found: ${subscription.planId}`);
+      console.error(`Plan not found: ${sub.planId}`);
       return null;
     }
 

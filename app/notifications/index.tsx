@@ -7,7 +7,7 @@ import { notificationService } from '@/lib/notificationService';
 
 interface Notification {
   id: string;
-  type: 'payment_received' | 'payment_failed' | 'subscription_changed' | 'invoice_issued' | 'invoice_overdue';
+  type: 'user_created' | 'subscription_changed' | 'payment_received' | 'payment_failed' | 'invoice_issued' | 'invoice_overdue';
   title: string;
   message: string;
   timestamp: Date;

@@ -3,6 +3,7 @@ import { View, Text, FlatList, Pressable, RefreshControl, StyleSheet } from 'rea
 import { useColors } from '@/hooks/use-colors';
 import { ScreenContainer } from '@/components/screen-container';
 import { Bell, Trash2, CheckCircle, AlertCircle, Info } from 'lucide-react-native';
+import { notificationService } from '@/lib/notificationService';
 
 interface Notification {
   id: string;
@@ -28,7 +29,19 @@ export default function NotificationsScreen() {
   const loadNotifications = async () => {
     try {
       setLoading(true);
-      // Mock data for now
+      const result = await notificationService.getNotifications({
+        limit: 50,
+        offset: 0,
+        filter: filter === 'unread' ? 'unread' : 'all',
+      });
+      
+      if (result && result.notifications) {
+        const transformedNotifications = notificationService.transformNotifications(result.notifications);
+        setNotifications(transformedNotifications);
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+      // Fallback to mock data if API fails
       const mockNotifications: Notification[] = [
         {
           id: '1',
@@ -38,26 +51,8 @@ export default function NotificationsScreen() {
           timestamp: new Date(Date.now() - 3600000),
           read: false,
         },
-        {
-          id: '2',
-          type: 'subscription_changed',
-          title: 'تم تحديث الاشتراك',
-          message: 'تم ترقية اشتراكك إلى الخطة الاحترافية',
-          timestamp: new Date(Date.now() - 86400000),
-          read: true,
-        },
-        {
-          id: '3',
-          type: 'invoice_issued',
-          title: 'فاتورة جديدة',
-          message: 'تم إصدار فاتورة جديدة برقم INV-001234',
-          timestamp: new Date(Date.now() - 172800000),
-          read: true,
-        },
       ];
       setNotifications(mockNotifications);
-    } catch (error) {
-      console.error('Error loading notifications:', error);
     } finally {
       setLoading(false);
     }
@@ -90,15 +85,29 @@ export default function NotificationsScreen() {
   };
 
   const markAsRead = async (notificationId: string) => {
-    setNotifications(prev =>
-      prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
-    );
-    // TODO: Call API to mark as read
+    try {
+      // Update UI immediately
+      setNotifications(prev =>
+        prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+      );
+      // Call API to persist
+      await notificationService.markAsRead(notificationId);
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
   };
 
   const deleteNotification = async (notificationId: string) => {
-    setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    // TODO: Call API to delete notification
+    try {
+      // Update UI immediately
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      // Call API to persist
+      await notificationService.deleteNotification(notificationId);
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+      // Reload notifications if deletion fails
+      loadNotifications();
+    }
   };
 
   const filteredNotifications = filter === 'unread'

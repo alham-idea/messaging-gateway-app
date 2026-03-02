@@ -218,3 +218,36 @@
   - [x] إعداد CI/CD
   - [x] توثيق التطبيق
   - [x] إعداد المراقبة والتنبيهات
+
+
+## المرحلة 9: ربط التنبيهات بـ API الحقيقي
+- [x] إنشاء API endpoint للتنبيهات في الخادم
+  - [x] getNotifications - جلب التنبيهات
+  - [x] getUnreadCount - عدد التنبيهات غير المقروءة
+  - [x] markAsRead - تحديد التنبيه كمقروء
+  - [x] markAllAsRead - تحديد جميع التنبيهات كمقروءة
+  - [x] deleteNotification - حذف التنبيه
+  - [x] deleteAllNotifications - حذف جميع التنبيهات
+  - [x] getNotificationById - جلب تفاصيل التنبيه
+  - [x] createNotification - إنشاء تنبيه (للمسؤولين)
+- [x] إنشاء خدمة جلب التنبيهات في التطبيق (lib/notificationService.ts)
+  - [x] getNotifications - جلب التنبيهات من API
+  - [x] getUnreadCount - جلب عدد التنبيهات غير المقروءة
+  - [x] markAsRead - تحديد التنبيه كمقروء
+  - [x] markAllAsRead - تحديد جميع التنبيهات كمقروءة
+  - [x] deleteNotification - حذف التنبيه
+  - [x] getPreferences - جلب إعدادات التنبيهات
+  - [x] updatePreferences - تحديث إعدادات التنبيهات
+  - [x] sendTestNotification - إرسال تنبيه اختبار
+  - [x] transformNotification - تحويل التنبيه من صيغة الخادم
+- [x] تحديث شاشة التنبيهات لاستخدام API الحقيقي
+  - [x] استبدال البيانات الوهمية بجلب من API
+  - [x] تحديث وظيفة markAsRead لاستدعاء API
+  - [x] تحديث وظيفة deleteNotification لاستدعاء API
+  - [x] إضافة معالجة الأخطاء والبيانات الاحتياطية
+- [x] إنشاء اختبارات للتنبيهات (app/notifications/notifications.test.ts)
+  - [x] اختبار جلب التنبيهات
+  - [x] اختبار تحديد التنبيه كمقروء
+  - [x] اختبار حذف التنبيه
+  - [x] اختبار تحويل التنبيهات
+  - [x] اختبار إعدادات التنبيهات

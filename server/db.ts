@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, and, or, desc, asc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers, userSubscriptions, subscriptionHistory, paymentMethods, refunds, notifications, notificationPreferences, emailQueue, notificationHistory } from "../drizzle/schema";
 import { ENV } from "./_core/env";
@@ -576,9 +576,8 @@ export async function createInvoiceForSubscription(
     }
 
     // جلب بيانات الخطة
-    const plan = await db.query.subscriptionPlans.findFirst({
-      where: eq(subscriptionPlans.id, subscription.planId),
-    });
+    const planResult = await db.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, subscription.planId)).limit(1);
+    const plan = planResult.length > 0 ? planResult[0] : null;
 
     if (!plan) {
       console.error(`Plan not found: ${subscription.planId}`);
@@ -630,9 +629,7 @@ export async function createMonthlyInvoices(): Promise<number> {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
 
-    const subscriptions = await db.query.userSubscriptions.findMany({
-      where: eq(userSubscriptions.status, "active"),
-    });
+    const subscriptions = await db.select().from(userSubscriptions).where(eq(userSubscriptions.status, "active"));
 
     let count = 0;
     for (const subscription of subscriptions) {
@@ -661,9 +658,7 @@ export async function getPendingInvoices(): Promise<any[]> {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
 
-    return await db.query.invoices.findMany({
-      where: eq(invoices.invoiceStatus, "issued"),
-    });
+    return await db.select().from(invoices).where(eq(invoices.invoiceStatus, "issued"));
   } catch (error) {
     console.error("Error getting pending invoices:", error);
     return [];
@@ -678,9 +673,7 @@ export async function getOverdueInvoices(): Promise<any[]> {
     const db = await getDb();
     if (!db) throw new Error("Database not available");
 
-    return await db.query.invoices.findMany({
-      where: eq(invoices.invoiceStatus, "overdue"),
-    });
+    return await db.select().from(invoices).where(eq(invoices.invoiceStatus, "overdue"));
   } catch (error) {
     console.error("Error getting overdue invoices:", error);
     return [];

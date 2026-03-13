@@ -102,7 +102,7 @@ export default function SignupScreen() {
           {/* Logo Section */}
           <View className="items-center mb-8">
             <Image
-              source={require('@/assets/images/idea-logo.png')}
+              source={require('@/assets/images/icon.png')}
               style={{ width: 100, height: 100 }}
               resizeMode="contain"
             />

@@ -53,7 +53,7 @@ export default function LoginScreen() {
           {/* Logo Section */}
           <View className="items-center mb-12">
             <Image
-              source={require('@/assets/images/idea-logo.png')}
+              source={require('@/assets/images/icon.png')}
               style={{ width: 120, height: 120 }}
               resizeMode="contain"
             />

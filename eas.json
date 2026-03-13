@@ -1,0 +1,82 @@
+{
+  "cli": {
+    "version": ">= 5.0.0",
+    "promptToConfigurePushNotifications": false
+  },
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk",
+        "distribution": "internal",
+        "withoutCredentials": true,
+        "channel": "preview",
+        "resourceClass": "large",
+        "cache": {
+          "disabled": false,
+          "key": "android-preview-cache"
+        },
+        "env": {
+          "NODE_ENV": "production",
+          "EXPO_DEBUG": "false"
+        }
+      },
+      "ios": {
+        "buildType": "simulator",
+        "distribution": "internal",
+        "channel": "preview",
+        "resourceClass": "large",
+        "cache": {
+          "disabled": false,
+          "key": "ios-preview-cache"
+        },
+        "env": {
+          "NODE_ENV": "production",
+          "EXPO_DEBUG": "false"
+        }
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "apk",
+        "distribution": "store",
+        "channel": "production",
+        "resourceClass": "large",
+        "cache": {
+          "disabled": false,
+          "key": "android-production-cache"
+        },
+        "env": {
+          "NODE_ENV": "production",
+          "EXPO_DEBUG": "false"
+        }
+      },
+      "ios": {
+        "buildType": "archive",
+        "distribution": "store",
+        "channel": "production",
+        "resourceClass": "large",
+        "cache": {
+          "disabled": false,
+          "key": "ios-production-cache"
+        },
+        "env": {
+          "NODE_ENV": "production",
+          "EXPO_DEBUG": "false"
+        }
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "serviceAccount": "~/.android/production.json",
+        "track": "internal"
+      },
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "your-app-id",
+        "appleTeamId": "your-team-id"
+      }
+    }
+  }
+}

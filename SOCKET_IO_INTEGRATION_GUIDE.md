@@ -1,696 +1,706 @@
 # دليل ربط Socket.io - بوابة الرسائل
 
-**الإصدار:** 1.0  
+**الإصدار:** 2.0  
 **آخر تحديث:** مارس 2026  
-**المؤلف:** فريق تطوير بوابة الرسائل
+**المالك:** آيديا للاستشارات والحلول التسويقية والتقنية  
+**الغرض:** دليل تقني شامل لمبرمجي الشركات والمتاجر والمؤسسات لربط أنظمتهم مع بوابة الرسائل
 
 ---
 
 ## جدول المحتويات
 
-1. [مقدمة](#مقدمة)
-2. [متطلبات التكامل](#متطلبات-التكامل)
+1. [نظرة عامة](#نظرة-عامة)
+2. [المتطلبات](#المتطلبات)
 3. [بنية الاتصال](#بنية-الاتصال)
-4. [الأحداث والرسائل](#الأحداث-والرسائل)
-5. [أمثلة عملية](#أمثلة-عملية)
-6. [معالجة الأخطاء](#معالجة-الأخطاء)
-7. [الأمان والمصادقة](#الأمان-والمصادقة)
-8. [استكشاف الأخطاء](#استكشاف-الأخطاء)
+4. [المصادقة والأمان](#المصادقة-والأمان)
+5. [أحداث الإرسال](#أحداث-الإرسال)
+6. [أحداث الاستقبال](#أحداث-الاستقبال)
+7. [معالجة الأخطاء](#معالجة-الأخطاء)
+8. [أمثلة عملية](#أمثلة-عملية)
+9. [استكشاف الأخطاء](#استكشاف-الأخطاء)
 
 ---
 
-## مقدمة
+## نظرة عامة
 
-تطبيق **بوابة الرسائل** يوفر نظام اتصال فوري وموثوق عبر **Socket.io** يسمح لأنظمتك أو مواقعك بـ:
+**بوابة الرسائل** هي منصة متكاملة تمكّن الشركات والمتاجر والمؤسسات من إرسال رسائل SMS و WhatsApp إلى عملائهم من خلال تطبيق موبايل آمن وموثوق. يتم الربط بين نظام الشركة وبوابة الرسائل عبر بروتوكول Socket.io الذي يوفر اتصالاً ثنائي الاتجاه في الوقت الفعلي.
 
-- **استقبال الرسائل الفورية** من العملاء في الوقت الحقيقي
-- **إرسال الرسائل والإخطارات** إلى العملاء فوراً
-- **تتبع حالة الاتصال** والعمليات
-- **مزامنة البيانات** بين أنظمتك والتطبيق
+### آلية العمل
 
-هذا الدليل يشرح كيفية دمج نظامك مع بوابة الرسائل بشكل آمن وفعال.
+```
+نظام الشركة → Socket.io → تطبيق بوابة الرسائل → SMS/WhatsApp Gateway → العملاء
+```
+
+**المراحل:**
+
+1. **الشركة تسجل الدخول** إلى تطبيق بوابة الرسائل وتختار خطة اشتراك
+2. **الشركة تحصل على رابط الاتصال** (Socket.io URL) ومفتاح API
+3. **نظام الشركة يتصل** بـ Socket.io باستخدام المفتاح
+4. **الشركة ترسل الرسائل** عبر Socket.io
+5. **التطبيق يستقبل الرسائل** ويرسلها عبر SMS أو WhatsApp
+6. **التطبيق يرسل حالة الرسالة** (نجح، فشل، معلق) إلى نظام الشركة
 
 ---
 
-## متطلبات التكامل
+## المتطلبات
 
-### المتطلبات الأساسية
+### على جانب الشركة (Client)
 
-قبل البدء، تأكد من توفر:
-
-| المتطلب | الوصف | الإصدار الأدنى |
-|--------|-------|----------------|
-| **Node.js** | بيئة تشغيل JavaScript | 14.0.0 |
-| **Socket.io Client** | مكتبة الاتصال | 4.0.0+ |
-| **API Token** | رمز المصادقة من بوابة الرسائل | - |
-| **HTTPS/WSS** | اتصال آمن مشفر | - |
-
-### تثبيت المكتبات
+**المكتبات المطلوبة:**
 
 ```bash
-# Node.js / Express
+# Node.js / JavaScript
 npm install socket.io-client
 
 # Python
-pip install python-socketio python-engineio
+pip install python-socketio[client]
 
 # PHP
-composer require socketio/socket-io-php
+composer require socketio/socket-io-php-client
 
-# JavaScript / Browser
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+# Java
+# استخدم مكتبة Socket.IO Java Client
 ```
+
+**المعلومات المطلوبة:**
+
+| المعلومة | الوصف | مثال |
+|---------|-------|-------|
+| **Socket URL** | رابط الاتصال بـ Socket.io | `https://api.messaging-gateway.com` |
+| **API Key** | مفتاح المصادقة الفريد | `sk_live_abc123xyz789` |
+| **Company ID** | معرّف الشركة الفريد | `comp_12345` |
+| **Webhook URL** (اختياري) | رابط استقبال الإخطارات | `https://company.com/webhooks` |
+
+### على جانب بوابة الرسائل (Server)
+
+- **Node.js 18+** مع Express
+- **Socket.io 4.5+**
+- **قاعدة بيانات PostgreSQL**
+- **خدمات SMS و WhatsApp** (Twilio, Vonage, إلخ)
 
 ---
 
 ## بنية الاتصال
 
-### معلومات الخادم
+### خطوات الاتصال
 
-```
-الخادم: https://api.messaging-gateway.com
-WebSocket: wss://api.messaging-gateway.com/socket.io
-المنفذ: 443 (HTTPS/WSS)
-```
-
-### الاتصال الأولي
+**الخطوة 1: الاتصال الأولي**
 
 ```javascript
 const io = require('socket.io-client');
 
 const socket = io('https://api.messaging-gateway.com', {
-  auth: {
-    token: 'YOUR_API_TOKEN_HERE',
-    clientId: 'your-system-id',
-    clientSecret: 'your-system-secret'
-  },
+  transports: ['websocket', 'polling'],
   reconnection: true,
-  reconnectionDelay: 1000,
-  reconnectionDelayMax: 5000,
-  reconnectionAttempts: 5,
-  transports: ['websocket', 'polling']
+  reconnectionDelay: 5000,
+  reconnectionDelayMax: 10000,
+  reconnectionAttempts: 10,
+  autoConnect: true,
+  forceNew: true,
+  extraHeaders: {
+    'User-Agent': 'CompanyName/1.0'
+  }
 });
+```
 
-// الاتصال الناجح
+**الخطوة 2: معالجة الاتصال الناجح**
+
+```javascript
 socket.on('connect', () => {
-  console.log('تم الاتصال بنجاح:', socket.id);
-  // يمكنك الآن إرسال واستقبال الرسائل
+  console.log('✓ متصل بنجاح');
+  console.log('Socket ID:', socket.id);
+  
+  // إرسال بيانات المصادقة
+  socket.emit('auth:connect', {
+    apiKey: 'sk_live_abc123xyz789',
+    companyId: 'comp_12345',
+    version: '1.0'
+  }, (response) => {
+    if (response.success) {
+      console.log('✓ تم المصادقة بنجاح');
+    } else {
+      console.error('✗ فشلت المصادقة:', response.error);
+    }
+  });
 });
+```
 
-// فشل الاتصال
+**الخطوة 3: معالجة الأخطاء والقطع**
+
+```javascript
 socket.on('connect_error', (error) => {
-  console.error('خطأ الاتصال:', error);
+  console.error('✗ خطأ في الاتصال:', error);
 });
 
-// قطع الاتصال
 socket.on('disconnect', (reason) => {
-  console.log('تم قطع الاتصال:', reason);
+  console.log('✗ تم قطع الاتصال:', reason);
+  // سيحاول Socket.io إعادة الاتصال تلقائياً
+});
+
+socket.on('error', (error) => {
+  console.error('✗ خطأ:', error);
 });
 ```
 
 ---
 
-## الأحداث والرسائل
+## المصادقة والأمان
 
-### 1. أحداث الاستقبال (من التطبيق إلى نظامك)
+### آلية المصادقة
 
-#### `message:received` - استقبال رسالة جديدة
-
-**الوصف:** يتم إطلاق هذا الحدث عندما يرسل العميل رسالة جديدة.
-
-**البيانات المستقبلة:**
+**المصادقة تتم عبر API Key:**
 
 ```javascript
-socket.on('message:received', (data) => {
-  console.log('رسالة جديدة:', data);
-  
-  // البيانات المرسلة:
-  // {
-  //   id: "msg_123456",                    // معرف الرسالة الفريد
-  //   userId: "user_789",                  // معرف المستخدم
-  //   businessId: "bus_456",               // معرف المنشأة
-  //   content: "محتوى الرسالة",            // نص الرسالة
-  //   type: "text",                        // نوع الرسالة (text, image, file, etc)
-  //   attachments: [],                     // المرفقات
-  //   timestamp: 1678901234567,            // الوقت بالميلي ثانية
-  //   metadata: {                          // بيانات إضافية
-  //     deviceType: "mobile",
-  //     appVersion: "1.0.0",
-  //     location: { lat: 25.2048, lng: 55.2708 }
-  //   }
-  // }
+socket.emit('auth:connect', {
+  apiKey: 'sk_live_abc123xyz789',  // مفتاح API الفريد
+  companyId: 'comp_12345',         // معرّف الشركة
+  version: '1.0'                   // إصدار التطبيق
+}, (response) => {
+  if (response.success) {
+    console.log('✓ مصادق');
+  } else {
+    console.error('✗ فشلت المصادقة');
+    socket.disconnect();
+  }
 });
 ```
 
-**مثال عملي:**
+### معايير الأمان
+
+**التشفير:**
+- جميع الاتصالات عبر HTTPS/WSS (WebSocket Secure)
+- جميع البيانات مشفرة بـ TLS 1.3
+
+**المصادقة:**
+- API Key يجب أن يكون سري وآمن
+- لا تشارك API Key في الكود العام
+- استخدم متغيرات البيئة لتخزين API Key
+
+**التفويض:**
+- كل شركة لها صلاحيات محددة
+- لا يمكن الوصول إلى بيانات شركات أخرى
+- يتم تسجيل جميع العمليات للمراجعة
+
+**مثال آمن:**
 
 ```javascript
-socket.on('message:received', (data) => {
-  // حفظ الرسالة في قاعدة البيانات
-  saveMessageToDatabase(data);
-  
-  // إرسال إشعار للموظفين
-  notifyStaff({
-    userId: data.userId,
-    message: data.content,
-    timestamp: data.timestamp
-  });
-  
-  // تحديث واجهة المستخدم
-  updateUI(data);
-  
-  // إرسال تأكيد الاستقبال
-  socket.emit('message:ack', {
-    messageId: data.id,
-    status: 'received',
-    timestamp: Date.now()
-  });
+// ❌ غير آمن
+const socket = io('https://api.messaging-gateway.com', {
+  apiKey: 'sk_live_abc123xyz789'
+});
+
+// ✅ آمن
+const apiKey = process.env.MESSAGING_GATEWAY_API_KEY;
+const socket = io('https://api.messaging-gateway.com', {
+  apiKey: apiKey
 });
 ```
 
 ---
 
-#### `notification:sent` - إخطار تم إرساله
+## أحداث الإرسال
 
-**الوصف:** يتم إطلاق هذا الحدث عندما يتم إرسال إخطار للعميل.
+### 1. إرسال رسالة SMS
 
-**البيانات المستقبلة:**
+**الحدث:** `message:send:sms`
+
+**البيانات المطلوبة:**
 
 ```javascript
-socket.on('notification:sent', (data) => {
-  // {
-  //   id: "notif_123",
-  //   userId: "user_789",
-  //   title: "عنوان الإخطار",
-  //   message: "محتوى الإخطار",
-  //   type: "order_update",  // نوع الإخطار
-  //   actionUrl: "https://...",
-  //   timestamp: 1678901234567,
-  //   priority: "high"  // low, normal, high
-  // }
+socket.emit('message:send:sms', {
+  id: 'msg_unique_id_123',           // معرّف فريد للرسالة
+  phoneNumber: '+971501234567',      // رقم الهاتف (بصيغة دولية)
+  message: 'مرحباً! هذه رسالة اختبار', // محتوى الرسالة
+  timestamp: Date.now(),             // الوقت الحالي
+  priority: 'normal',                // الأولوية (low, normal, high)
+  metadata: {
+    orderId: 'ORD-2026-001',        // معرّف الطلب (اختياري)
+    customerId: 'cust_123',          // معرّف العميل (اختياري)
+    source: 'order_confirmation'     // مصدر الرسالة (اختياري)
+  }
+}, (response) => {
+  if (response.success) {
+    console.log('✓ تم إرسال الرسالة:', response.messageId);
+  } else {
+    console.error('✗ فشل الإرسال:', response.error);
+  }
 });
 ```
 
----
-
-#### `user:status:changed` - تغيير حالة المستخدم
-
-**الوصف:** يتم إطلاق هذا الحدث عند تغيير حالة المستخدم (متصل، غير متصل، مشغول، إلخ).
-
-**البيانات المستقبلة:**
+**الاستجابة:**
 
 ```javascript
-socket.on('user:status:changed', (data) => {
-  // {
-  //   userId: "user_789",
-  //   status: "online",  // online, offline, busy, away
-  //   timestamp: 1678901234567,
-  //   lastSeen: 1678901234567
-  // }
-});
+{
+  success: true,
+  messageId: 'msg_abc123xyz789',
+  status: 'pending',
+  timestamp: 1678901234567,
+  estimatedDeliveryTime: '2026-03-13T21:15:00Z'
+}
 ```
 
----
+### 2. إرسال رسالة WhatsApp
 
-#### `subscription:updated` - تحديث الاشتراك
+**الحدث:** `message:send:whatsapp`
 
-**الوصف:** يتم إطلاق هذا الحدث عند تحديث بيانات الاشتراك.
-
-**البيانات المستقبلة:**
+**البيانات المطلوبة:**
 
 ```javascript
-socket.on('subscription:updated', (data) => {
-  // {
-  //   userId: "user_789",
-  //   planId: "plan_premium",
-  //   status: "active",  // active, expired, cancelled
-  //   expiryDate: 1678901234567,
-  //   features: ["sms", "email", "push"],
-  //   messageLimit: 10000,
-  //   messagesUsed: 2500
-  // }
-});
-```
-
----
-
-### 2. أحداث الإرسال (من نظامك إلى التطبيق)
-
-#### `message:send` - إرسال رسالة
-
-**الوصف:** إرسال رسالة من نظامك إلى العميل.
-
-**البيانات المرسلة:**
-
-```javascript
-socket.emit('message:send', {
-  recipientId: "user_789",              // معرف المستقبل
-  content: "محتوى الرسالة",             // نص الرسالة
-  type: "text",                         // نوع الرسالة
-  priority: "normal",                   // low, normal, high
-  attachments: [                        // المرفقات (اختياري)
+socket.emit('message:send:whatsapp', {
+  id: 'msg_unique_id_456',
+  phoneNumber: '+971501234567',
+  message: 'مرحباً! هذه رسالة واتساب',
+  timestamp: Date.now(),
+  priority: 'normal',
+  attachments: [                     // المرفقات (اختياري)
     {
-      type: "image",
-      url: "https://example.com/image.jpg",
-      size: 102400
+      type: 'image',
+      url: 'https://example.com/image.jpg',
+      caption: 'صورة المنتج'
     }
   ],
-  metadata: {                           // بيانات إضافية
-    orderId: "order_123",
-    source: "web_portal"
+  metadata: {
+    orderId: 'ORD-2026-001',
+    customerId: 'cust_123',
+    source: 'order_confirmation'
   }
 }, (response) => {
-  // رد الخادم
   if (response.success) {
-    console.log('تم إرسال الرسالة:', response.messageId);
+    console.log('✓ تم إرسال الرسالة:', response.messageId);
   } else {
-    console.error('فشل الإرسال:', response.error);
+    console.error('✗ فشل الإرسال:', response.error);
   }
 });
 ```
 
-**أمثلة عملية:**
+### 3. إرسال رسائل جماعية
+
+**الحدث:** `message:send:batch`
+
+**البيانات المطلوبة:**
 
 ```javascript
-// إرسال تحديث الطلب
-socket.emit('message:send', {
-  recipientId: "user_789",
-  content: "تم تحديث حالة طلبك إلى 'قيد التوصيل'",
-  type: "text",
-  priority: "high",
-  metadata: {
-    orderId: "order_123",
-    status: "in_delivery"
-  }
-});
-
-// إرسال صورة
-socket.emit('message:send', {
-  recipientId: "user_789",
-  content: "صورة الفاتورة",
-  type: "image",
-  attachments: [{
-    type: "image",
-    url: "https://example.com/invoice.jpg",
-    size: 204800
-  }]
-});
-```
-
----
-
-#### `notification:push` - إرسال إخطار
-
-**الوصف:** إرسال إخطار فوري للعميل.
-
-**البيانات المرسلة:**
-
-```javascript
-socket.emit('notification:push', {
-  recipientId: "user_789",
-  title: "عنوان الإخطار",
-  message: "محتوى الإخطار",
-  type: "order_update",
-  priority: "high",
-  actionUrl: "https://app.example.com/orders/123",
-  icon: "https://example.com/icon.png",
-  sound: true,
-  vibrate: true
-}, (response) => {
-  console.log('حالة الإخطار:', response);
-});
-```
-
----
-
-#### `broadcast:message` - بث رسالة لعدة مستخدمين
-
-**الوصف:** إرسال رسالة واحدة لعدة مستخدمين في نفس الوقت.
-
-**البيانات المرسلة:**
-
-```javascript
-socket.emit('broadcast:message', {
-  recipientIds: ["user_1", "user_2", "user_3"],
-  content: "رسالة موجهة للجميع",
-  type: "text",
-  priority: "normal"
-}, (response) => {
-  console.log('عدد الرسائل المرسلة:', response.sentCount);
-  console.log('الفشل:', response.failedCount);
-});
-```
-
----
-
-#### `user:update:status` - تحديث حالة المستخدم
-
-**الوصف:** تحديث حالة المستخدم في النظام.
-
-**البيانات المرسلة:**
-
-```javascript
-socket.emit('user:update:status', {
-  userId: "user_789",
-  status: "busy",  // online, offline, busy, away
-  statusMessage: "في اجتماع الآن",
-  timestamp: Date.now()
-});
-```
-
----
-
-#### `analytics:track` - تتبع الأحداث التحليلية
-
-**الوصف:** إرسال بيانات تحليلية للنظام.
-
-**البيانات المرسلة:**
-
-```javascript
-socket.emit('analytics:track', {
-  eventName: "user_action",
-  userId: "user_789",
-  eventData: {
-    action: "clicked_button",
-    buttonName: "subscribe",
-    timestamp: Date.now()
-  },
-  metadata: {
-    source: "web_portal",
-    version: "1.0.0"
-  }
-});
-```
-
----
-
-## أمثلة عملية
-
-### مثال 1: نظام إدارة الطلبات
-
-```javascript
-const io = require('socket.io-client');
-
-const socket = io('https://api.messaging-gateway.com', {
-  auth: {
-    token: 'YOUR_API_TOKEN',
-    clientId: 'order-management-system'
-  }
-});
-
-socket.on('connect', () => {
-  console.log('تم الاتصال بنظام بوابة الرسائل');
-});
-
-// استقبال رسالة من العميل
-socket.on('message:received', (data) => {
-  // تحديث حالة الطلب في قاعدة البيانات
-  updateOrderStatus(data.metadata.orderId, 'customer_contacted');
-  
-  // إرسال رد تلقائي
-  socket.emit('message:send', {
-    recipientId: data.userId,
-    content: 'شكراً لتواصلك معنا. سيتم الرد عليك قريباً.',
-    type: 'text',
-    metadata: {
-      orderId: data.metadata.orderId,
-      autoReply: true
+socket.emit('message:send:batch', {
+  batchId: 'batch_unique_id_789',
+  messages: [
+    {
+      id: 'msg_1',
+      phoneNumber: '+971501234567',
+      message: 'رسالة 1',
+      type: 'sms'
+    },
+    {
+      id: 'msg_2',
+      phoneNumber: '+971509876543',
+      message: 'رسالة 2',
+      type: 'whatsapp'
     }
-  });
+  ],
+  timestamp: Date.now(),
+  metadata: {
+    campaignId: 'camp_123',
+    source: 'marketing_campaign'
+  }
+}, (response) => {
+  if (response.success) {
+    console.log('✓ تم إرسال الرسائل:', response.batchId);
+    console.log('عدد الرسائل:', response.totalMessages);
+  } else {
+    console.error('✗ فشل الإرسال:', response.error);
+  }
 });
+```
 
-// عند تحديث حالة الطلب
-function updateOrderStatus(orderId, newStatus) {
-  // حفظ في قاعدة البيانات
-  db.orders.update({ id: orderId }, { status: newStatus });
-  
-  // إرسال إخطار للعميل
-  const order = db.orders.findOne({ id: orderId });
-  socket.emit('notification:push', {
-    recipientId: order.userId,
-    title: 'تحديث الطلب',
-    message: `تم تحديث حالة طلبك إلى: ${newStatus}`,
-    type: 'order_update',
-    actionUrl: `https://app.example.com/orders/${orderId}`,
-    priority: 'high'
-  });
-}
+### 4. جدولة الرسائل
+
+**الحدث:** `message:schedule`
+
+**البيانات المطلوبة:**
+
+```javascript
+socket.emit('message:schedule', {
+  id: 'msg_scheduled_123',
+  phoneNumber: '+971501234567',
+  message: 'رسالة مجدولة',
+  type: 'sms',
+  scheduleTime: 1678901234567,      // الوقت المطلوب (timestamp)
+  timezone: 'Asia/Dubai',            // المنطقة الزمنية
+  priority: 'normal',
+  metadata: {
+    orderId: 'ORD-2026-001'
+  }
+}, (response) => {
+  if (response.success) {
+    console.log('✓ تم جدولة الرسالة:', response.messageId);
+  } else {
+    console.error('✗ فشل الجدولة:', response.error);
+  }
+});
 ```
 
 ---
 
-### مثال 2: موقع التجارة الإلكترونية
+## أحداث الاستقبال
+
+### 1. تحديث حالة الرسالة
+
+**الحدث:** `message:status:updated`
+
+يتم استقبال هذا الحدث عندما تتغير حالة الرسالة:
 
 ```javascript
-// اتصال العميل
-const socket = io('https://api.messaging-gateway.com', {
-  auth: {
-    token: 'YOUR_API_TOKEN',
-    clientId: 'ecommerce-platform'
-  }
-});
-
-// عند إتمام عملية شراء
-function completeCheckout(orderId, userId) {
-  // إرسال تأكيد الطلب
-  socket.emit('message:send', {
-    recipientId: userId,
-    content: `تم استلام طلبك برقم ${orderId}. سيتم معالجته قريباً.`,
-    type: 'text',
-    priority: 'high',
-    metadata: {
-      orderId: orderId,
-      eventType: 'order_confirmed'
-    }
+socket.on('message:status:updated', (data) => {
+  console.log('تحديث حالة الرسالة:', {
+    messageId: data.messageId,
+    status: data.status,              // pending, sent, delivered, failed, read
+    timestamp: data.timestamp,
+    error: data.error                 // رسالة الخطأ إن وجدت
   });
   
-  // إرسال إخطار
-  socket.emit('notification:push', {
-    recipientId: userId,
-    title: 'تم تأكيد طلبك',
-    message: 'شكراً لك على الشراء',
-    actionUrl: `https://shop.example.com/orders/${orderId}`,
-    priority: 'high'
-  });
-}
+  // تحديث قاعدة البيانات الخاصة بك
+  updateMessageStatus(data.messageId, data.status);
+});
+```
 
-// استقبال استفسارات العملاء
-socket.on('message:received', (data) => {
-  // تسجيل الاستفسار
-  logCustomerInquiry({
-    userId: data.userId,
-    message: data.content,
+**الحالات الممكنة:**
+
+| الحالة | الوصف |
+|--------|-------|
+| **pending** | الرسالة في انتظار الإرسال |
+| **sent** | تم إرسال الرسالة |
+| **delivered** | تم استلام الرسالة من قبل العميل |
+| **failed** | فشل إرسال الرسالة |
+| **read** | تم قراءة الرسالة (WhatsApp فقط) |
+
+### 2. استقبال إخطارات الأحداث
+
+**الحدث:** `event:notification`
+
+يتم استقبال إخطارات الأحداث المهمة:
+
+```javascript
+socket.on('event:notification', (data) => {
+  console.log('إخطار حدث:', {
+    eventType: data.eventType,
+    severity: data.severity,          // info, warning, error
+    message: data.message,
     timestamp: data.timestamp
   });
   
-  // إرسال إخطار للفريق
-  notifyCustomerServiceTeam(data);
+  // معالجة الإخطار
+  handleNotification(data);
 });
 ```
 
----
+**أنواع الأحداث:**
 
-### مثال 3: تطبيق الخدمات
+| النوع | الوصف |
+|------|-------|
+| **quota_warning** | تنبيه من اقتراب الحد الأقصى للرسائل |
+| **quota_exceeded** | تم تجاوز الحد الأقصى للرسائل |
+| **payment_failed** | فشل الدفع |
+| **subscription_expiring** | الاشتراك سينتهي قريباً |
+| **service_maintenance** | صيانة الخدمة |
+
+### 3. استقبال تقارير الأداء
+
+**الحدث:** `analytics:report`
+
+يتم استقبال تقارير الأداء الدورية:
 
 ```javascript
-const socket = io('https://api.messaging-gateway.com', {
-  auth: {
-    token: 'YOUR_API_TOKEN',
-    clientId: 'service-app'
-  }
-});
-
-// تحديث حالة الخدمة
-function updateServiceStatus(serviceId, userId, status) {
-  const statusMessages = {
-    'accepted': 'تم قبول طلب الخدمة',
-    'in_progress': 'الخدمة قيد التنفيذ',
-    'completed': 'تم إنهاء الخدمة',
-    'cancelled': 'تم إلغاء الخدمة'
-  };
-  
-  socket.emit('message:send', {
-    recipientId: userId,
-    content: statusMessages[status],
-    type: 'text',
-    metadata: {
-      serviceId: serviceId,
-      status: status
-    }
+socket.on('analytics:report', (data) => {
+  console.log('تقرير الأداء:', {
+    period: data.period,              // hourly, daily, weekly
+    totalSent: data.totalSent,
+    totalDelivered: data.totalDelivered,
+    deliveryRate: data.deliveryRate,
+    failureRate: data.failureRate,
+    timestamp: data.timestamp
   });
-  
-  // إذا اكتملت الخدمة، طلب التقييم
-  if (status === 'completed') {
-    setTimeout(() => {
-      socket.emit('notification:push', {
-        recipientId: userId,
-        title: 'قيّم الخدمة',
-        message: 'هل استمتعت بالخدمة؟ شارك رأيك معنا',
-        actionUrl: `https://app.example.com/rate/${serviceId}`,
-        priority: 'normal'
-      });
-    }, 3600000); // بعد ساعة
-  }
-}
+});
 ```
 
 ---
 
 ## معالجة الأخطاء
 
-### أنواع الأخطاء الشائعة
+### أنواع الأخطاء
+
+| الكود | الوصف | الحل |
+|------|-------|-------|
+| **AUTH_FAILED** | فشلت المصادقة | تحقق من API Key |
+| **INVALID_PHONE** | رقم الهاتف غير صحيح | استخدم صيغة دولية (+971...) |
+| **QUOTA_EXCEEDED** | تم تجاوز الحد الأقصى | ترقية الخطة أو انتظر التجديد |
+| **SERVICE_ERROR** | خطأ في الخدمة | أعد المحاولة لاحقاً |
+| **NETWORK_ERROR** | خطأ في الشبكة | تحقق من الاتصال |
+
+### معالجة الأخطاء
 
 ```javascript
-socket.on('error', (error) => {
-  console.error('خطأ عام:', error);
-});
-
-// خطأ المصادقة
-socket.on('auth:failed', (data) => {
-  console.error('فشل المصادقة:', data.message);
-  // تحديث الرمز والاتصال مجدداً
-});
-
-// خطأ في الإرسال
-socket.emit('message:send', { /* ... */ }, (response) => {
-  if (!response.success) {
-    switch(response.errorCode) {
-      case 'INVALID_RECIPIENT':
-        console.error('المستقبل غير صحيح');
-        break;
-      case 'QUOTA_EXCEEDED':
-        console.error('تم تجاوز حد الرسائل');
-        break;
-      case 'INVALID_MESSAGE':
-        console.error('محتوى الرسالة غير صحيح');
-        break;
-      default:
-        console.error('خطأ غير معروف:', response.error);
-    }
+socket.on('error:message', (error) => {
+  console.error('خطأ:', {
+    code: error.code,
+    message: error.message,
+    details: error.details
+  });
+  
+  // معالجة الخطأ بناءً على نوعه
+  switch (error.code) {
+    case 'QUOTA_EXCEEDED':
+      console.log('تم تجاوز الحد الأقصى للرسائل');
+      // إخطار المستخدم بالترقية
+      break;
+    case 'INVALID_PHONE':
+      console.log('رقم الهاتف غير صحيح');
+      // تصحيح رقم الهاتف
+      break;
+    case 'SERVICE_ERROR':
+      console.log('خطأ في الخدمة، سيتم إعادة المحاولة');
+      // إعادة محاولة لاحقاً
+      break;
   }
 });
+```
 
-// معالجة فشل الاتصال
-socket.on('connect_error', (error) => {
-  console.error('خطأ الاتصال:', error.message);
+### إعادة المحاولة التلقائية
+
+```javascript
+function sendMessageWithRetry(message, maxRetries = 3) {
+  let attempts = 0;
   
-  // إعادة محاولة الاتصال
-  setTimeout(() => {
-    socket.connect();
-  }, 5000);
-});
+  function attempt() {
+    attempts++;
+    socket.emit('message:send:sms', message, (response) => {
+      if (response.success) {
+        console.log('✓ تم الإرسال بنجاح');
+      } else if (attempts < maxRetries) {
+        console.log(`محاولة ${attempts + 1} من ${maxRetries}`);
+        setTimeout(attempt, 5000); // انتظر 5 ثوان قبل إعادة المحاولة
+      } else {
+        console.error('✗ فشل الإرسال بعد عدة محاولات');
+      }
+    });
+  }
+  
+  attempt();
+}
 ```
 
 ---
 
-## الأمان والمصادقة
+## أمثلة عملية
 
-### توليد الرمز (Token)
+### مثال 1: متجر إلكتروني
+
+**السيناريو:** إرسال تأكيد الطلب للعميل
 
 ```javascript
-// في الخادم الخاص بك
-const jwt = require('jsonwebtoken');
-
-function generateToken(clientId, clientSecret) {
-  const token = jwt.sign(
-    {
-      clientId: clientId,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 3600 // ينتهي بعد ساعة
-    },
-    clientSecret,
-    { algorithm: 'HS256' }
-  );
-  
-  return token;
+// عند إنشاء طلب جديد
+function handleOrderCreated(order) {
+  socket.emit('message:send:sms', {
+    id: `order_${order.id}`,
+    phoneNumber: order.customer.phone,
+    message: `تم تأكيد طلبك #${order.id}. المبلغ: ${order.total} درهم. سيتم التوصيل خلال 24 ساعة.`,
+    timestamp: Date.now(),
+    priority: 'high',
+    metadata: {
+      orderId: order.id,
+      customerId: order.customer.id,
+      source: 'order_confirmation'
+    }
+  }, (response) => {
+    if (response.success) {
+      console.log('✓ تم إرسال تأكيد الطلب');
+      // تحديث قاعدة البيانات
+      updateOrderStatus(order.id, 'confirmation_sent');
+    }
+  });
 }
 
-// الاستخدام
-const token = generateToken('your-client-id', 'your-client-secret');
+// عند شحن الطلب
+function handleOrderShipped(order) {
+  socket.emit('message:send:whatsapp', {
+    id: `shipped_${order.id}`,
+    phoneNumber: order.customer.phone,
+    message: `تم شحن طلبك #${order.id}. رقم التتبع: ${order.trackingNumber}`,
+    timestamp: Date.now(),
+    priority: 'normal',
+    metadata: {
+      orderId: order.id,
+      customerId: order.customer.id,
+      source: 'order_shipped'
+    }
+  });
+}
 ```
 
-### التحقق من الأمان
+### مثال 2: تطبيق الخدمات
+
+**السيناريو:** إخطار العميل بقبول الطلب
 
 ```javascript
-// استخدم HTTPS/WSS دائماً
-const socket = io('wss://api.messaging-gateway.com', {
-  auth: {
-    token: token,
-    clientId: 'your-client-id'
-  },
-  secure: true,
-  rejectUnauthorized: true
-});
+function handleServiceAccepted(service) {
+  socket.emit('message:send:whatsapp', {
+    id: `service_${service.id}`,
+    phoneNumber: service.customer.phone,
+    message: `تم قبول طلب الخدمة الخاص بك. سيصل ${service.provider.name} خلال ${service.estimatedTime} دقيقة.`,
+    timestamp: Date.now(),
+    priority: 'high',
+    attachments: [
+      {
+        type: 'image',
+        url: service.provider.photo,
+        caption: 'صورة مقدم الخدمة'
+      }
+    ],
+    metadata: {
+      serviceId: service.id,
+      customerId: service.customer.id,
+      providerId: service.provider.id,
+      source: 'service_accepted'
+    }
+  });
+}
+```
 
-// تحديث الرمز قبل انتهاء صلاحيته
-setInterval(() => {
-  const newToken = generateToken('your-client-id', 'your-client-secret');
-  socket.auth.token = newToken;
-  socket.connect();
-}, 3000000); // كل 50 دقيقة
+### مثال 3: نظام الدعم الفني
+
+**السيناريو:** إخطار العميل بحل المشكلة
+
+```javascript
+function handleTicketResolved(ticket) {
+  socket.emit('message:send:sms', {
+    id: `ticket_${ticket.id}`,
+    phoneNumber: ticket.customer.phone,
+    message: `تم حل مشكلتك برقم التذكرة #${ticket.id}. شكراً لتواصلك معنا.`,
+    timestamp: Date.now(),
+    priority: 'normal',
+    metadata: {
+      ticketId: ticket.id,
+      customerId: ticket.customer.id,
+      source: 'ticket_resolved'
+    }
+  }, (response) => {
+    if (response.success) {
+      // إرسال رسالة متابعة بعد 24 ساعة
+      socket.emit('message:schedule', {
+        id: `followup_${ticket.id}`,
+        phoneNumber: ticket.customer.phone,
+        message: 'هل تم حل المشكلة بشكل كامل؟ نرجو تقييم الخدمة.',
+        type: 'sms',
+        scheduleTime: Date.now() + (24 * 60 * 60 * 1000),
+        timezone: 'Asia/Dubai',
+        metadata: {
+          ticketId: ticket.id,
+          source: 'ticket_followup'
+        }
+      });
+    }
+  });
+}
 ```
 
 ---
 
 ## استكشاف الأخطاء
 
-### تفعيل وضع التصحيح
+### المشكلة: لا يمكن الاتصال بـ Socket.io
+
+**الأسباب المحتملة:**
+
+1. **رابط الاتصال غير صحيح** - تحقق من الرابط
+2. **مشكلة في الشبكة** - تحقق من الاتصال بالإنترنت
+3. **جدار الحماية** - قد يحجب WebSocket
+
+**الحل:**
 
 ```javascript
+// تفعيل السجلات التفصيلية
 const socket = io('https://api.messaging-gateway.com', {
-  auth: { token: 'YOUR_TOKEN' },
-  debug: true,
-  logger: console
+  transports: ['websocket', 'polling'],
+  reconnection: true,
+  debug: true  // تفعيل السجلات
 });
 
-// تسجيل جميع الأحداث
-socket.onAny((event, ...args) => {
-  console.log(`[${new Date().toISOString()}] Event: ${event}`, args);
-});
-
-// تسجيل الأخطاء
-socket.onAnyOutgoing((event, ...args) => {
-  console.log(`[OUTGOING] ${event}`, args);
+socket.on('connect_error', (error) => {
+  console.error('تفاصيل الخطأ:', error);
+  console.error('الرسالة:', error.message);
+  console.error('الكود:', error.code);
 });
 ```
 
-### فحص الاتصال
+### المشكلة: فشل المصادقة
+
+**الأسباب المحتملة:**
+
+1. **API Key غير صحيح** - تحقق من المفتاح
+2. **انتهت صلاحية API Key** - طلب مفتاح جديد
+3. **الشركة غير مسجلة** - تحقق من معرّف الشركة
+
+**الحل:**
 
 ```javascript
-// التحقق من حالة الاتصال
-console.log('معرف الاتصال:', socket.id);
-console.log('حالة الاتصال:', socket.connected);
-console.log('المحرك المستخدم:', socket.io.engine.transport.name);
+socket.on('auth:failed', (error) => {
+  console.error('فشلت المصادقة:', error.message);
+  
+  // إعادة محاولة المصادقة
+  setTimeout(() => {
+    socket.emit('auth:connect', {
+      apiKey: process.env.MESSAGING_GATEWAY_API_KEY,
+      companyId: process.env.COMPANY_ID,
+      version: '1.0'
+    });
+  }, 5000);
+});
+```
 
-// قائمة الأحداث المسجلة
-console.log('الأحداث:', Object.keys(socket._events));
+### المشكلة: الرسائل لا تُرسل
+
+**الأسباب المحتملة:**
+
+1. **أرقام الهاتف غير صحيحة** - استخدم صيغة دولية
+2. **تم تجاوز الحد الأقصى** - ترقية الخطة
+3. **الخدمة معطلة** - تحقق من حالة الخدمة
+
+**الحل:**
+
+```javascript
+// التحقق من صيغة الهاتف
+function isValidPhoneNumber(phone) {
+  return /^\+\d{1,15}$/.test(phone);
+}
+
+// إرسال مع التحقق
+socket.emit('message:send:sms', {
+  id: 'msg_123',
+  phoneNumber: '+971501234567',  // يجب أن تبدأ بـ +
+  message: 'رسالة اختبار',
+  timestamp: Date.now()
+}, (response) => {
+  if (!response.success) {
+    console.error('خطأ:', response.error);
+    
+    if (response.error === 'INVALID_PHONE') {
+      console.log('رقم الهاتف غير صحيح');
+    } else if (response.error === 'QUOTA_EXCEEDED') {
+      console.log('تم تجاوز الحد الأقصى');
+    }
+  }
+});
 ```
 
 ---
 
-## ملخص البيانات المتبادلة
+## الخلاصة
 
-| الحدث | الاتجاه | الوصف |
-|------|--------|-------|
-| `message:received` | ← | استقبال رسالة من العميل |
-| `message:send` | → | إرسال رسالة للعميل |
-| `notification:sent` | ← | إخطار تم إرساله |
-| `notification:push` | → | إرسال إخطار فوري |
-| `user:status:changed` | ← | تغيير حالة المستخدم |
-| `user:update:status` | → | تحديث حالة المستخدم |
-| `subscription:updated` | ← | تحديث الاشتراك |
-| `broadcast:message` | → | بث رسالة لعدة مستخدمين |
-| `analytics:track` | → | تتبع الأحداث |
+هذا الدليل يوفر جميع المعلومات اللازمة لربط نظام الشركة مع بوابة الرسائل بنجاح. تأكد من:
 
----
-
-## الخطوات التالية
-
-1. **الحصول على API Token** - تواصل مع فريق الدعم للحصول على رمز المصادقة
-2. **اختبار الاتصال** - استخدم أحد الأمثلة أعلاه للتأكد من الاتصال
-3. **تطبيق الأحداث** - أضف معالجات الأحداث المطلوبة لنظامك
-4. **اختبار شامل** - تأكد من أن جميع الأحداث تعمل بشكل صحيح
-5. **النشر** - انشر التطبيق في بيئة الإنتاج
+- ✅ استخدام صيغة صحيحة للبيانات
+- ✅ معالجة الأخطاء بشكل صحيح
+- ✅ الحفاظ على أمان API Key
+- ✅ مراقبة حالة الاتصال
+- ✅ تسجيل جميع العمليات
 
 ---
 
@@ -698,11 +708,13 @@ console.log('الأحداث:', Object.keys(socket._events));
 
 للمساعدة والدعم الفني:
 
-- **البريد الإلكتروني:** support@messaging-gateway.com
+- **البريد الإلكتروني:** support@idea-solutions.com
 - **الهاتف:** +971-4-XXXX-XXXX
-- **الموقع:** https://messaging-gateway.com/support
-- **التوثيق:** https://docs.messaging-gateway.com
+- **الموقع:** https://messaging-gateway.idea-solutions.com/support
+- **التوثيق:** https://docs.messaging-gateway.idea-solutions.com
 
 ---
 
-**ملاحظة:** يتم تحديث هذا الدليل بانتظام. تأكد من مراجعة أحدث إصدار قبل التطوير.
+**ملاحظة مهمة:** يتم تحديث هذا الدليل بانتظام مع إضافة ميزات جديدة أو تحسينات. تأكد من مراجعة أحدث إصدار قبل البدء بالتطوير.
+
+**آخر تحديث:** مارس 2026

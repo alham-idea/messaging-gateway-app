@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import WebView from 'react-native-webview';
-import { whatsAppDesktopService } from '@/lib/services/whatsapp-desktop-service';
+import { whatsAppService } from '@/lib/services/whatsapp-service';
 
 interface WhatsAppWebViewProps {
   onReady?: () => void;
@@ -13,20 +13,28 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [stats, setStats] = useState({ isReady: false, isDesktop: false, pendingMessages: 0, incomingMessages: 0 });
+  const [injectionStatus, setInjectionStatus] = useState<'pending' | 'success' | 'failed'>('pending');
 
   useEffect(() => {
-    // تعيين مرجع WebView للخدمة الجديدة
-    whatsAppDesktopService.setWebViewRef(webViewRef.current);
+    // تعيين مرجع WebView للخدمة
+    whatsAppService.setWebViewRef(webViewRef.current);
   }, []);
 
   const handleWebViewMessage = (event: any) => {
-    whatsAppDesktopService.handleWebViewMessage(event);
-    // تحديث الإحصائيات
-    const currentStats = whatsAppDesktopService.getStats();
-    setStats(currentStats);
-    setIsDesktop(currentStats.isDesktop);
+    whatsAppService.handleWebViewMessage(event);
+    
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'WHATSAPP_READY') {
+        setIsReady(true);
+        setInjectionStatus('success');
+        onReady?.();
+      } else if (data.type === 'ERROR') {
+        setInjectionStatus('failed');
+      }
+    } catch(e) {
+      // ignore JSON parse error
+    }
   };
 
   const handleLoadStart = () => {
@@ -36,10 +44,19 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
 
   const handleLoadEnd = () => {
     setIsLoading(false);
-    // حقن كود المراقبة والاكتشاف بعد تحميل الصفحة
-    whatsAppDesktopService.injectMonitoringScript();
-    setIsReady(true);
-    onReady?.();
+    
+    // حقن كود بسيط للتحقق من جاهزية واتساب (ظهور الشاشة الرئيسية)
+    const checkReadyCode = `
+      setInterval(() => {
+        const isReady = document.querySelector('#pane-side') || document.querySelector('[data-testid="chat-list"]');
+        if (isReady && !window.whatsappIsReadyFired) {
+          window.whatsappIsReadyFired = true;
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'WHATSAPP_READY' }));
+        }
+      }, 2000);
+      true;
+    `;
+    webViewRef.current?.injectJavaScript(checkReadyCode);
   };
 
   const handleError = (syntheticEvent: any) => {
@@ -56,7 +73,7 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
       <View className="bg-surface border-b border-border px-4 py-3 flex-row items-center justify-between">
         <View className="flex-1">
           <Text className="text-sm font-semibold text-foreground">
-            واتساب ويب {isDesktop ? '🖥️ سطح المكتب' : '📱 الهاتف'}
+            واتساب ويب
           </Text>
           <Text className="text-xs text-muted mt-1">
             {isReady ? '✓ جاهز' : isLoading ? 'جاري التحميل...' : 'غير متصل'}
@@ -68,23 +85,18 @@ export function WhatsAppWebView({ onReady, onError }: WhatsAppWebViewProps) {
         )}
       </View>
 
-      {/* شريط الإحصائيات */}
-      {isReady && (
-        <View className="bg-surface/50 border-b border-border px-4 py-2 flex-row justify-around">
-          <View className="items-center">
-            <Text className="text-xs text-muted">رسائل معلقة</Text>
-            <Text className="text-sm font-semibold text-foreground">{stats.pendingMessages}</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-xs text-muted">رسائل واردة</Text>
-            <Text className="text-sm font-semibold text-foreground">{stats.incomingMessages}</Text>
-          </View>
-          <View className="items-center">
-            <Text className="text-xs text-muted">الحالة</Text>
-            <Text className="text-sm font-semibold text-foreground">{stats.isReady ? '✓' : '✗'}</Text>
-          </View>
+      {/* شريط الإحصائيات / حالة الحقن */}
+      <View className="bg-surface/50 border-b border-border px-4 py-2 flex-row justify-between items-center">
+        <View className="flex-row items-center">
+          <Text className="text-xs text-muted mr-2">حالة أتمتة واتساب:</Text>
+          {injectionStatus === 'pending' && <Text className="text-xs font-semibold text-warning">⏳ قيد الانتظار</Text>}
+          {injectionStatus === 'success' && <Text className="text-xs font-semibold text-success">✅ جاهز للإرسال</Text>}
+          {injectionStatus === 'failed' && <Text className="text-xs font-semibold text-error">❌ فشل في الحقن</Text>}
         </View>
-      )}
+        <TouchableOpacity onPress={() => webViewRef.current?.reload()} className="bg-surface border border-border px-2 py-1 rounded">
+            <Text className="text-xs text-foreground">تحديث الصفحة</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* رسالة الخطأ */}
       {error && (

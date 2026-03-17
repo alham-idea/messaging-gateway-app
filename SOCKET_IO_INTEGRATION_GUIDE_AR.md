@@ -37,6 +37,18 @@ const io = new Server(3000, {
   }
 });
 
+// Middleware for Authentication (وسيط للمصادقة)
+io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
+  const MY_SECRET_TOKEN = "your_secure_random_string"; // قم بتغيير هذا الرمز!
+
+  if (token === MY_SECRET_TOKEN) {
+    next();
+  } else {
+    next(new Error("Authentication error: Invalid Token"));
+  }
+});
+
 console.log("🚀 Client Socket Server running on port 3000");
 
 io.on("connection", (socket) => {

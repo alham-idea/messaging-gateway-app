@@ -36,6 +36,7 @@ export default function ConnectionManagerScreen() {
   });
 
   const [socketUrl, setSocketUrl] = useState('');
+  const [secretToken, setSecretToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [autoConnect, setAutoConnect] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -49,8 +50,12 @@ export default function ConnectionManagerScreen() {
   const loadConnectionInfo = async () => {
     try {
       const url = await AsyncStorage.getItem('socketUrl');
+      const token = await AsyncStorage.getItem('secretToken');
       if (url) {
         setSocketUrl(url);
+      }
+      if (token) {
+        setSecretToken(token);
       }
       updateConnectionInfo();
     } catch (error) {
@@ -81,11 +86,12 @@ export default function ConnectionManagerScreen() {
     try {
       setIsLoading(true);
 
-      // حفظ الرابط
+      // حفظ الرابط والرمز السري
       await AsyncStorage.setItem('socketUrl', socketUrl);
+      await AsyncStorage.setItem('secretToken', secretToken);
 
       // الاتصال
-      await socketService.connect(socketUrl);
+      await socketService.connect(socketUrl, secretToken);
 
       Alert.alert('✓ النجاح', 'تم الاتصال بالمنصة بنجاح');
       updateConnectionInfo();
@@ -135,7 +141,7 @@ export default function ConnectionManagerScreen() {
       setIsLoading(true);
       socketService.disconnect();
       await new Promise((resolve) => setTimeout(resolve, 500));
-      await socketService.connect(socketUrl);
+      await socketService.connect(socketUrl, secretToken);
       updateConnectionInfo();
       Alert.alert('✓ النجاح', 'تم إعادة الاتصال بنجاح');
     } catch (error) {
@@ -229,13 +235,26 @@ export default function ConnectionManagerScreen() {
           {/* إدخال رابط Socket */}
           <View className="bg-surface rounded-lg p-4 border border-border">
             <Text className="text-sm font-semibold text-foreground mb-2">
-              رابط Socket
+              رابط السيرفر (Socket URL)
             </Text>
             <TextInput
               value={socketUrl}
               onChangeText={setSocketUrl}
               placeholder="http://example.com:3000"
               placeholderTextColor="#9BA1A6"
+              editable={!isLoading && !connectionInfo.isConnected}
+              className="bg-background border border-border rounded px-3 py-2 text-foreground mb-4"
+            />
+
+            <Text className="text-sm font-semibold text-foreground mb-2">
+              الرمز السري (Secret Token - اختياري)
+            </Text>
+            <TextInput
+              value={secretToken}
+              onChangeText={setSecretToken}
+              placeholder="أدخل الرمز السري للمصادقة"
+              placeholderTextColor="#9BA1A6"
+              secureTextEntry
               editable={!isLoading && !connectionInfo.isConnected}
               className="bg-background border border-border rounded px-3 py-2 text-foreground mb-3"
             />

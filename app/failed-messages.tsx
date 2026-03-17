@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { FailedMessageCard } from '@/components/failed-message-card';
 import { useRetryManager } from '@/hooks/use-retry-manager';
+import { messageHandlerService } from '@/lib/services/message-handler-service';
 import { cn } from '@/lib/utils';
 
 export default function FailedMessagesScreen() {
@@ -11,9 +12,11 @@ export default function FailedMessagesScreen() {
   const { failedMessages, stats, removeFailedMessage, clearAll } = useRetryManager();
 
   const handleRetry = useCallback((messageId: string) => {
-    // سيتم تنفيذ إعادة المحاولة تلقائياً من قبل retryService
     console.log(`🔄 إعادة محاولة يدوية للرسالة ${messageId}`);
-  }, []);
+    messageHandlerService.retryMessage(messageId);
+    // إزالة الرسالة من القائمة الفاشلة مؤقتاً حتى تعود بنتيجة
+    removeFailedMessage(messageId);
+  }, [removeFailedMessage]);
 
   const handleRemove = useCallback((messageId: string) => {
     removeFailedMessage(messageId);

@@ -10,10 +10,9 @@ export default function WhatsAppScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // الاستماع للرسائل الواردة
+    // الاستماع للرسائل الواردة من واتساب
     const unsubscribe = whatsAppService.onMessageReceived((message) => {
       console.log('📨 رسالة واردة:', message);
-      // يمكن إضافة إشعار هنا
     });
 
     return () => {

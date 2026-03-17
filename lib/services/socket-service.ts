@@ -50,7 +50,7 @@ class SocketService {
   /**
    * تهيئة الاتصال بـ Socket.io
    */
-  public connect(url: string): Promise<void> {
+  public connect(url: string, token?: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         this.socketUrl = url;
@@ -64,7 +64,10 @@ class SocketService {
           reconnectionAttempts: this.maxReconnectAttempts,
           autoConnect: true,
           forceNew: true,
-          // تحديد User-Agent للتطبيق
+          // تحديد User-Agent للتطبيق وإرسال رمز المصادقة
+          auth: {
+            token: token || ''
+          },
           extraHeaders: {
             'User-Agent': `MessagingGateway/1.0 (${Platform.OS})`
           }

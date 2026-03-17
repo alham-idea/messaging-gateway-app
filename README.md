@@ -19,7 +19,7 @@ The Messaging Gateway App is an Android application designed to act as a bridge 
 -   **UI Framework**: React Native Elements + NativeWind (Tailwind CSS).
 -   **Real-time Communication**: `socket.io-client` (for connecting to client servers).
 -   **WhatsApp Automation**: `react-native-webview` with JavaScript Injection.
--   **Local Storage**: `AsyncStorage` & `expo-secure-store`.
+-   **Local Storage**: `expo-sqlite` (Persistent Queue) & `AsyncStorage` (Settings).
 -   **API Client**: tRPC (for communication with Idea's backend).
 
 ### Idea's Backend Server

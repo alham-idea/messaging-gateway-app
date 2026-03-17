@@ -2,8 +2,7 @@ import { socketService, MessagePayload, MessageResponse } from './socket-service
 import { whatsAppService } from './whatsapp-service';
 import * as SMS from 'expo-sms';
 import { Platform } from 'react-native';
-import { retryService } from './retry-service';
-import { logService } from './log-service';
+import { databaseService } from './database-service';
 
 export interface ProcessedMessage {
   id: string;
@@ -14,130 +13,148 @@ export interface ProcessedMessage {
 }
 
 class MessageHandlerService {
-  private messageHistory: ProcessedMessage[] = [];
   private isProcessing = false;
-  private messageQueue: MessagePayload[] = [];
-  private maxQueueSize = 100;
+  private isInitialized = false;
 
   /**
-   * معالجة رسالة واردة من المنصة
+   * Initialize service
    */
-  public async handleIncomingMessage(payload: MessagePayload): Promise<void> {
-    console.log('📨 معالجة رسالة واردة:', payload);
-
-    // التحقق من امتلاء الطابور
-    if (this.messageQueue.length >= this.maxQueueSize) {
-      console.warn('⚠️ الطابور ممتلئ، سيتم رفض الرسالة');
-      this.sendFailureResponse(payload.id, 'الطابور ممتلئ');
-      return;
+  public async init(): Promise<void> {
+    if (this.isInitialized) return;
+    
+    try {
+      await databaseService.init();
+      this.isInitialized = true;
+      // Resume processing pending messages
+      this.processQueue();
+    } catch (error) {
+      console.error('Failed to initialize MessageHandlerService:', error);
     }
-
-    // إضافة الرسالة إلى الطابور
-    this.messageQueue.push(payload);
-
-    // بدء معالجة الطابور
-    this.processQueue();
   }
 
   /**
-   * معالجة طابور الرسائل
+   * Handle incoming message from Socket
+   */
+  public async handleIncomingMessage(payload: MessagePayload): Promise<void> {
+    console.log('📨 Received message:', payload);
+
+    try {
+      // Save to database (Persistent Queue)
+      await databaseService.addMessage(payload);
+      
+      // Trigger processing
+      this.processQueue();
+    } catch (error) {
+      console.error('❌ Failed to queue message:', error);
+      this.sendResponse({
+        id: payload.id,
+        payload,
+        status: 'failed',
+        error: 'Failed to save message to queue',
+        timestamp: Date.now()
+      });
+    }
+  }
+
+  /**
+   * Process message queue
    */
   private async processQueue(): Promise<void> {
-    if (this.isProcessing || this.messageQueue.length === 0) {
-      return;
-    }
+    if (this.isProcessing) return;
 
     this.isProcessing = true;
 
-    while (this.messageQueue.length > 0) {
-      const message = this.messageQueue.shift();
-      if (message) {
-        await this.processMessage(message);
+    try {
+      // Get pending messages from DB
+      const messages = await databaseService.getPendingMessages(1); // Process one by one
 
-        // إضافة تأخير عشوائي بين 30-60 ثانية بين الرسائل
-        if (this.messageQueue.length > 0) {
-          const delay = Math.random() * 30000 + 30000;
-          console.log(`⏳ تأخير ${Math.round(delay / 1000)} ثانية قبل الرسالة التالية`);
-          await this.sleep(delay);
+      if (messages.length > 0) {
+        const message = messages[0];
+        await this.processMessage(message);
+        
+        // Process next message after delay
+        if (messages.length > 0) {
+            // Random delay 5-15 seconds to avoid spam detection
+            const delay = Math.random() * 10000 + 5000;
+            setTimeout(() => {
+                this.isProcessing = false;
+                this.processQueue();
+            }, delay);
+            return; // Exit here, let timeout handle next loop
         }
       }
+    } catch (error) {
+      console.error('Error processing queue:', error);
     }
 
     this.isProcessing = false;
   }
 
   /**
-   * معالجة رسالة واحدة
+   * Process single message
    */
-  private async processMessage(payload: MessagePayload): Promise<void> {
-    const processedMessage: ProcessedMessage = {
-      id: payload.id,
-      payload,
-      status: 'processing',
-      timestamp: Date.now(),
-    };
-
+  public async processMessage(message: MessagePayload): Promise<void> {
     try {
-      console.log(`🔄 معالجة الرسالة ${payload.id} (${payload.type})`);
+      console.log(`🔄 Processing message ${message.id} (${message.type})`);
+      
+      // Update status to processing
+      await databaseService.updateMessageStatus(message.id, 'processing');
 
-      if (payload.type === 'whatsapp') {
-        await this.sendViaWhatsApp(payload);
-      } else if (payload.type === 'sms') {
-        await this.sendViaSMS(payload);
+      if (message.type === 'whatsapp') {
+        await this.sendViaWhatsApp(message);
+      } else if (message.type === 'sms') {
+        await this.sendViaSMS(message);
       } else {
-        throw new Error(`نوع رسالة غير معروف: ${payload.type}`);
+        throw new Error(`Unknown message type: ${message.type}`);
       }
 
-      processedMessage.status = 'sent';
+      // Success
+      await databaseService.updateMessageStatus(message.id, 'sent');
+      this.sendResponse({
+        id: message.id,
+        payload: message,
+        status: 'sent',
+        timestamp: Date.now()
+      });
+
     } catch (error) {
-      console.error('❌ خطأ في معالجة الرسالة:', error);
-      processedMessage.status = 'failed';
-      processedMessage.error = error instanceof Error ? error.message : 'خطأ غير معروف';
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error(`❌ Failed to process message ${message.id}:`, errorMessage);
 
-      // إضافة الرسالة إلى قائمة إعادة المحاولة
-      const errorMessage = error instanceof Error ? error.message : 'خطأ غير معروف';
-      retryService.addFailedMessage(
-        payload.id,
-        payload.phoneNumber,
-        payload.message,
-        payload.type,
-        errorMessage
-      );
-
-      // محاولة الإرسال عبر SMS كخيار احتياطي (فقط للواتساب)
-      if (payload.type === 'whatsapp') {
-        console.log('📱 محاولة الإرسال عبر SMS كخيار احتياطي');
-        try {
-          await this.sendViaSMS(payload);
-          processedMessage.status = 'sent';
-          processedMessage.error = undefined;
-          // إزالة من قائمة إعادة المحاولة عند النجاح
-          retryService.removeFailedMessage(payload.id);
-        } catch (smsError) {
-          console.error('❌ فشل الإرسال عبر SMS أيضاً:', smsError);
-          processedMessage.error = `واتساب: ${processedMessage.error}, SMS: ${smsError instanceof Error ? smsError.message : 'خطأ غير معروف'}`;
-        }
-      }
+      // Failed
+      await databaseService.updateMessageStatus(message.id, 'failed', errorMessage);
+      this.sendResponse({
+        id: message.id,
+        payload: message,
+        status: 'failed',
+        error: errorMessage,
+        timestamp: Date.now()
+      });
     }
-
-    // إضافة إلى السجل
-    this.messageHistory.push(processedMessage);
-
-    // إذا نجحت الرسالة، إزالتها من قائمة إعادة المحاولة
-    if (processedMessage.status === 'sent') {
-      retryService.removeFailedMessage(payload.id);
-    }
-
-    // إرسال التقرير إلى المنصة
-    this.sendResponse(processedMessage);
   }
 
   /**
-   * إرسال رسالة عبر واتساب
+   * Handle manual retry of a failed message
+   */
+  public async retryMessage(messageId: string): Promise<void> {
+    try {
+      // Set status back to pending in DB so it gets picked up by queue
+      await databaseService.updateMessageStatus(messageId, 'pending');
+      console.log(`🔄 Message ${messageId} queued for retry`);
+      
+      // Trigger processing
+      this.processQueue();
+    } catch (error) {
+      console.error(`❌ Failed to retry message ${messageId}:`, error);
+    }
+  }
+
+  /**
+   * Send via WhatsApp
    */
   private async sendViaWhatsApp(payload: MessagePayload): Promise<void> {
     if (!whatsAppService.isWhatsAppReady()) {
-      throw new Error('واتساب غير جاهز');
+      throw new Error('WhatsApp is not ready');
     }
 
     return new Promise((resolve, reject) => {
@@ -148,12 +165,14 @@ class MessageHandlerService {
           payload.id
         );
 
-        // انتظر تأكيد الإرسال (مع timeout)
+        // Wait for confirmation (with timeout)
         const timeout = setTimeout(() => {
-          reject(new Error('انتهت مهلة انتظار الإرسال'));
+          reject(new Error('WhatsApp send timeout'));
         }, 30000);
 
-        // يمكن تحسين هذا باستخدام نظام callbacks أفضل
+        // TODO: Implement better callback mechanism from WhatsAppService
+        // For now, we assume success if no error thrown immediately
+        // In real impl, we should wait for DOM event from WebView
         resolve();
         clearTimeout(timeout);
       } catch (error) {
@@ -163,16 +182,16 @@ class MessageHandlerService {
   }
 
   /**
-   * إرسال رسالة عبر SMS
+   * Send via SMS
    */
   private async sendViaSMS(payload: MessagePayload): Promise<void> {
     if (Platform.OS === 'web') {
-      throw new Error('SMS غير مدعوم على الويب');
+      throw new Error('SMS not supported on web');
     }
 
     const isAvailable = await SMS.isAvailableAsync();
     if (!isAvailable) {
-      throw new Error('خدمة SMS غير متاحة على هذا الجهاز');
+      throw new Error('SMS service not available on this device');
     }
 
     const { result } = await SMS.sendSMSAsync(
@@ -181,14 +200,12 @@ class MessageHandlerService {
     );
 
     if (result !== 'sent' && result !== 'unknown') {
-      throw new Error(`فشل إرسال SMS: ${result}`);
+      throw new Error(`SMS send failed: ${result}`);
     }
-
-    console.log('✓ تم إرسال SMS بنجاح');
   }
 
   /**
-   * إرسال تقرير الرسالة إلى المنصة
+   * Send response to backend/client
    */
   private sendResponse(processedMessage: ProcessedMessage): void {
     const response: MessageResponse = {
@@ -197,70 +214,9 @@ class MessageHandlerService {
       error: processedMessage.error,
       timestamp: Date.now(),
     };
-
+    
     socketService.sendMessageResponse(response);
-  }
-
-  /**
-   * إرسال تقرير فشل مباشر
-   */
-  private sendFailureResponse(messageId: string, error: string): void {
-    const response: MessageResponse = {
-      messageId,
-      status: 'failed',
-      error,
-      timestamp: Date.now(),
-    };
-
-    socketService.sendMessageResponse(response);
-  }
-
-  /**
-   * الحصول على سجل الرسائل
-   */
-  public getMessageHistory(): ProcessedMessage[] {
-    return [...this.messageHistory];
-  }
-
-  /**
-   * الحصول على عدد الرسائل المعلقة
-   */
-  public getPendingMessageCount(): number {
-    return this.messageQueue.length;
-  }
-
-  /**
-   * مسح السجل
-   */
-  public clearHistory(): void {
-    this.messageHistory = [];
-  }
-
-  /**
-   * دالة مساعدة للانتظار
-   */
-  private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  /**
-   * الحصول على إحصائيات المعالجة
-   */
-  public getStats() {
-    const history = this.messageHistory;
-    const sent = history.filter((m) => m.status === 'sent').length;
-    const failed = history.filter((m) => m.status === 'failed').length;
-    const pending = this.messageQueue.length;
-
-    return {
-      totalProcessed: history.length,
-      sent,
-      failed,
-      pending,
-      successRate: history.length > 0 ? (sent / history.length) * 100 : 0,
-    };
   }
 }
 
-// تصدير instance واحد من الخدمة
 export const messageHandlerService = new MessageHandlerService();

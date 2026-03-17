@@ -15,14 +15,16 @@ The Messaging Gateway App turns your Android device into a powerful SMS and What
 ### 2. Connect to Your Server
 1.  Go to **Settings** -> **Connection Manager**.
 2.  Enter your **Socket.io Server URL** (e.g., `https://myserver.com`).
-3.  Tap **Connect**.
-4.  Wait for the status to turn **Green (Connected)**.
+3.  Enter your **Secret Token** (if your server requires authentication).
+4.  Tap **Connect**.
+5.  Wait for the status to turn **Green (Connected)**.
 
 ### 3. Setup WhatsApp
 1.  Go to the **WhatsApp** tab.
 2.  The app will load WhatsApp Web.
 3.  Scan the QR code using your personal phone (Linked Devices).
-4.  Keep the app open or in the background to maintain the connection.
+4.  Check the **"WhatsApp Automation Status"** bar. It should show **"✅ Ready to Send"** (جاهز للإرسال) once the QR is scanned and the chat interface is fully loaded.
+5.  Keep the app open or in the background to maintain the connection.
 
 ---
 
@@ -41,6 +43,7 @@ The Messaging Gateway App turns your Android device into a powerful SMS and What
 ### Settings
 -   **App Settings**: Configure general preferences.
 -   **Logs**: View the history of sent and failed messages.
+-   **Failed Messages**: View a list of messages that failed to send. You can manually retry sending them or clear the list.
 
 ---
 

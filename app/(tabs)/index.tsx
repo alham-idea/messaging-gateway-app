@@ -150,10 +150,21 @@ export default function HomeScreen() {
 
           {/* بطاقة الطابور */}
           <View className="bg-surface rounded-lg p-4 border border-border">
-            <Text className="text-sm text-muted mb-2">الرسائل المعلقة</Text>
-            <Text className="text-3xl font-bold text-foreground">
-              {queueCount}
-            </Text>
+            <Text className="text-sm text-muted mb-2">إحصائيات الرسائل</Text>
+            <View className="flex-row justify-between">
+              <View className="items-center">
+                <Text className="text-2xl font-bold text-foreground">{queueStats.pending}</Text>
+                <Text className="text-xs text-muted">معلقة</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-2xl font-bold text-success">{queueStats.sent}</Text>
+                <Text className="text-xs text-muted">تم الإرسال</Text>
+              </View>
+              <View className="items-center">
+                <Text className="text-2xl font-bold text-error">{queueStats.failed}</Text>
+                <Text className="text-xs text-muted">فشلت</Text>
+              </View>
+            </View>
           </View>
 
           {/* بطاقة الرسائل الفاشلة */}
@@ -305,9 +316,9 @@ export default function HomeScreen() {
               </Text>
               <FlatList
                 data={logs.slice(0, 5)}
-                keyExtractor={(item) => item.id}
+                keyExtractor={(item: LogEntry) => item.id}
                 scrollEnabled={false}
-                renderItem={({ item }) => (
+                renderItem={({ item }: { item: LogEntry }) => (
                   <View className="py-2 border-b border-border last:border-b-0">
                     <View className="flex-row justify-between items-start">
                       <Text className="text-xs text-muted flex-1">

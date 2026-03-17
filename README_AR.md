@@ -19,7 +19,7 @@
 -   **واجهة المستخدم**: NativeWind (Tailwind CSS).
 -   **الاتصال اللحظي**: `socket.io-client` (للربط مع سيرفرات العملاء).
 -   **أتمتة واتساب**: `react-native-webview` مع حقن JavaScript.
--   **التخزين المحلي**: `AsyncStorage` و `expo-secure-store`.
+-   **التخزين المحلي**: `expo-sqlite` (طابور رسائل دائم) و `AsyncStorage` (للإعدادات).
 -   **عميل API**: مكتبة tRPC (للتواصل مع سيرفر آيديا).
 
 ### سيرفر آيديا (Backend)

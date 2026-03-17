@@ -80,61 +80,127 @@ class WhatsAppService {
    * إرسال رسالة عبر واتساب
    */
   public async sendMessage(phoneNumber: string, message: string, messageId: string): Promise<void> {
-    if (!this.isReady) {
-      console.warn('⚠️ واتساب غير جاهز، سيتم إضافة الرسالة إلى الطابور');
-      this.messageQueue.push({ phoneNumber, message, messageId });
-      return;
+    if (!this.webViewRef) {
+        console.warn('⚠️ مرجع WebView غير متوفر');
+        return;
     }
 
     // تنسيق رقم الهاتف (إزالة الأحرف غير الرقمية)
     const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
 
-    // كود JavaScript لإرسال الرسالة
+    // كود JavaScript المحسن لإرسال الرسالة
     const jsCode = `
       (async () => {
+        function getElement(selectors) {
+            for (const selector of selectors) {
+                const el = document.querySelector(selector);
+                if (el) return el;
+            }
+            return null;
+        }
+
+        function triggerInputEvent(element, value) {
+            const inputEvent = new InputEvent('input', {
+                bubbles: true,
+                cancelable: true,
+            });
+            element.textContent = value;
+            element.dispatchEvent(inputEvent);
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
         try {
-          // البحث عن حقل البحث أو الدردشة
-          const searchInput = document.querySelector('[contenteditable="true"]');
+          // 1. استخدام رابط API لفتح المحادثة (أكثر موثوقية من البحث اليدوي)
+          // هذا سيقوم بتحميل المحادثة مع الرسالة في صندوق النص
+          // ملاحظة: نستخدم location.assign لتجنب إضافة سجل التاريخ
+          // window.location.assign('https://web.whatsapp.com/send?phone=${cleanPhoneNumber}&text=${encodeURIComponent(message)}');
           
-          if (!searchInput) {
-            throw new Error('لم يتم العثور على حقل الإدخال');
+          // الطريقة البديلة: محاولة البحث عن المحادثة إذا كنا بالفعل في الواجهة
+          // لتجنب إعادة تحميل الصفحة بالكامل إذا لم يكن ضرورياً
+          
+          const chatSelectors = [
+            'div[contenteditable="true"][data-tab="10"]',
+            '#main footer div[contenteditable="true"]',
+            'footer div[contenteditable="true"]',
+            'div[role="textbox"][contenteditable="true"]'
+          ];
+
+          let messageInput = getElement(chatSelectors);
+
+          // إذا لم نجد حقل الكتابة، ربما نحتاج لفتح المحادثة أولاً
+          if (!messageInput) {
+             // الانتقال المباشر للمحادثة (قد يستغرق وقتاً للتحميل)
+             window.location.href = 'https://web.whatsapp.com/send?phone=${cleanPhoneNumber}&text=${encodeURIComponent(message)}';
+             
+             // ننتظر حتى يظهر زر الإرسال أو حقل النص
+             let attempts = 0;
+             while (attempts < 20) { // انتظار حتى 10 ثواني
+                await sleep(500);
+                const sendBtn = getElement(['button[data-testid="compose-btn-send"]', 'span[data-icon="send"]']);
+                if (sendBtn) {
+                    sendBtn.click();
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'MESSAGE_SENT',
+                        messageId: '${messageId}',
+                        status: 'sent',
+                        timestamp: Date.now()
+                    }));
+                    return;
+                }
+                attempts++;
+             }
+             throw new Error('Timeout waiting for chat load');
           }
 
-          // محاولة الوصول إلى الرسالة من خلال واجهة الويب
-          const messageInput = document.querySelector('[aria-label="اكتب رسالة"]') || 
-                              document.querySelector('[contenteditable="true"]');
+          // إذا وجدنا حقل الكتابة (نحن بالفعل في محادثة مفتوحة)
+          // ملاحظة: هذا يتطلب أن نكون في المحادثة الصحيحة! 
+          // لذا الخيار الأكثر أماناً هو دائماً استخدام الرابط أعلاه، 
+          // ولكن لغرض "السرعة" إذا كنا نرسل لنفس الشخص، يمكننا الكتابة مباشرة.
+          // للتبسيط والموثوقية في هذا الإصدار: سنعتمد على التوجيه بالرابط إذا اختلف الرقم،
+          // ولكن بما أننا لا نعرف الرقم الحالي المفتوح، سنستخدم الرابط دائماً.
           
-          if (messageInput) {
-            messageInput.textContent = '${message}';
-            messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+          window.location.href = 'https://web.whatsapp.com/send?phone=${cleanPhoneNumber}&text=${encodeURIComponent(message)}';
+          
+          let attempts = 0;
+          while (attempts < 30) { // انتظار 15 ثانية
+            await sleep(500);
             
-            // البحث عن زر الإرسال
-            const sendButton = document.querySelector('[data-testid="send"]') ||
-                              document.querySelector('[aria-label="أرسل"]') ||
-                              Array.from(document.querySelectorAll('button')).find(btn => 
-                                btn.textContent.includes('أرسل') || btn.textContent.includes('Send')
-                              );
-            
-            if (sendButton) {
-              sendButton.click();
-              window.postMessage({
-                type: 'MESSAGE_SENT',
-                messageId: '${messageId}',
-                status: 'sent',
-                timestamp: Date.now()
-              }, '*');
-            } else {
-              throw new Error('لم يتم العثور على زر الإرسال');
+            // محاولة البحث عن زر الإرسال مباشرة (لأن النص معبأ مسبقاً)
+            const sendBtn = getElement([
+                'button[data-testid="compose-btn-send"]', 
+                'span[data-icon="send"]',
+                'button[aria-label="Send"]',
+                'button[aria-label="إرسال"]'
+            ]);
+
+            if (sendBtn) {
+                // وجدنا الزر، نضغط عليه
+                // قد يكون الزر داخل عنصر آخر، نتأكد من ضغط الزر الفعلي
+                const clickable = sendBtn.closest('button') || sendBtn;
+                clickable.click();
+                
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'MESSAGE_SENT',
+                    messageId: '${messageId}',
+                    status: 'sent',
+                    timestamp: Date.now()
+                }));
+                return;
             }
-          } else {
-            throw new Error('لم يتم العثور على حقل الرسالة');
+            attempts++;
           }
+          
+          throw new Error('Send button not found after navigation');
+
         } catch (error) {
-          window.postMessage({
+          window.ReactNativeWebView.postMessage(JSON.stringify({
             type: 'ERROR',
             messageId: '${messageId}',
             error: error.message
-          }, '*');
+          }));
         }
       })();
       true;

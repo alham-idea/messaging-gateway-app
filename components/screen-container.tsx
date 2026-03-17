@@ -5,6 +5,10 @@ import { cn } from "@/lib/utils";
 
 export interface ScreenContainerProps extends ViewProps {
   /**
+   * Children components
+   */
+  children?: React.ReactNode;
+  /**
    * SafeArea edges to apply. Defaults to ["top", "left", "right"].
    * Bottom is typically handled by Tab Bar.
    */

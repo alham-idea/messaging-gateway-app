@@ -51,6 +51,11 @@ graph TD
     *   **الهدف**: استقبال محتوى الرسائل مباشرة من نظام العميل دون المرور بسيرفرات آيديا.
     *   **ملفات الكود**: `app/connection-manager.tsx`, `lib/services/socket-service.ts`.
 
+#### نظام طابور الرسائل (Message Queueing)
+*   **التقنية**: طابور محلي دائم باستخدام `expo-sqlite`.
+*   **الهدف**: ضمان عدم ضياع الرسائل في حال تعطل التطبيق أو انقطاع الشبكة.
+*   **ملفات الكود**: `lib/services/database-service.ts`, `lib/services/message-handler-service.ts`.
+
 #### آلية أتمتة واتساب
 *   **الملف**: `lib/services/whatsapp-service.ts`
 *   **التقنية**: حقن الكود في المتصفح (WebView DOM Injection).

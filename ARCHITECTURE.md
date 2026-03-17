@@ -51,6 +51,11 @@ The core of the solution. It maintains two distinct network connections:
     *   **Purpose**: Receiving message payloads directly from the client's system.
     *   **File Reference**: `app/connection-manager.tsx`, `lib/services/socket-service.ts`.
 
+#### Message Queueing
+*   **Technique**: Persistent local queue using `expo-sqlite`.
+*   **Purpose**: Ensures messages are not lost if the app crashes or network is unstable.
+*   **File Reference**: `lib/services/database-service.ts`, `lib/services/message-handler-service.ts`.
+
 #### WhatsApp Automation Mechanism
 *   **File**: `lib/services/whatsapp-service.ts`
 *   **Technique**: WebView DOM Injection.

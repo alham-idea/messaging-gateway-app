@@ -1,152 +1,117 @@
-# دليل ربط Socket.io - بوابة الرسائل
+# Client Server Implementation Guide (Socket.io)
 
-**الإصدار:** 1.0  
-**آخر تحديث:** مارس 2026  
-**المالك:** آيديا للاستشارات والحلول التسويقية والتقنية
-
----
-
-## 📋 نظرة عامة
-
-هذا الدليل موجه للمبرمجين الذين يريدون ربط أنظمتهم أو مواقعهم أو منصاتهم مع تطبيق **بوابة الرسائل** عبر **Socket.io**. 
-
-### آلية العمل:
-1. نظام العميل يتصل بـ Socket.io باستخدام API Key
-2. نظام العميل يرسل أمر إرسال رسالة (SMS أو WhatsApp)
-3. التطبيق يستقبل الأمر ويرسل الرسالة من هاتف العميل
-4. التطبيق يرسل تقرير بحالة الرسالة (نجح/فشل)
+**Version:** 2.0  
+**Updated:** March 2026  
+**Architecture:** Decentralized (BYOD)
 
 ---
 
-## 🔑 الحصول على API Key
+## 📋 Overview
 
-1. قم بتسجيل الدخول إلى **لوحة التحكم الإدارية**
-2. انتقل إلى **الإعدادات** → **API Keys**
-3. انقر على **إنشاء مفتاح جديد**
-4. انسخ المفتاح واحفظه في مكان آمن
+In the Messaging Gateway architecture, **YOU (The Client)** host the Socket.io server. The Android Gateway App connects to **your server** to receive message sending commands. This ensures that your message data flows directly from your system to your device, without passing through Idea's backend.
 
-**⚠️ تحذير أمني:** لا تشارك API Key مع أحد، واستخدمه فقط على الخادم الخاص بك.
+### How it works:
+1.  You spin up a Socket.io server (Node.js, Python, etc.).
+2.  You enter your server's URL into the Android App (Connection Manager).
+3.  The App connects to your server.
+4.  Your system emits `send_message` events to the App.
+5.  The App processes the request and sends `message_response` back to your server.
 
 ---
 
-## 🔌 الاتصال بـ Socket.io
+## 🚀 Setting up the Server (Node.js Example)
 
-### URL الاتصال:
-```
-wss://your-server-url/socket.io/?apiKey=YOUR_API_KEY
+### 1. Install Dependencies
+```bash
+npm install socket.io
 ```
 
-### مثال باستخدام Node.js:
+### 2. Create Server Code (`server.js`)
+
 ```javascript
-const io = require('socket.io-client');
+const { Server } = require("socket.io");
 
-const socket = io('wss://your-server-url', {
-  query: {
-    apiKey: 'YOUR_API_KEY'
-  },
-  transports: ['websocket', 'polling'],
-  reconnection: true,
-  reconnectionDelay: 5000,
-  reconnectionDelayMax: 10000,
-  reconnectionAttempts: 10,
-  autoConnect: true,
-  forceNew: true
+const io = new Server(3000, {
+  cors: {
+    origin: "*", // Allow connections from the App
+  }
 });
 
-socket.on('connect', () => {
-  console.log('✓ متصل بـ بوابة الرسائل');
-  console.log('Client ID:', socket.id);
+console.log("🚀 Client Socket Server running on port 3000");
+
+io.on("connection", (socket) => {
+  console.log(`📱 Gateway Connected: ${socket.id}`);
+
+  // 1. Listen for Device Status Reports
+  socket.on("device_status", (status) => {
+    console.log("🔋 Device Status:", status);
+    // Save to your database...
+  });
+
+  // 2. Listen for Message Delivery Reports
+  socket.on("message_response", (response) => {
+    console.log("📨 Message Report:", response);
+    // Update your order status...
+  });
+
+  socket.on("disconnect", () => {
+    console.log("⚠️ Gateway Disconnected");
+  });
 });
 
-socket.on('connect_error', (error) => {
-  console.error('✗ خطأ في الاتصال:', error);
-});
+// Example: Function to send a message via the connected Gateway
+function sendWhatsApp(phoneNumber, text) {
+  const messagePayload = {
+    id: `msg_${Date.now()}`,
+    type: 'whatsapp',
+    phoneNumber: phoneNumber, // e.g., "+96650xxxxxxx"
+    message: text,
+    timestamp: Date.now()
+  };
 
-socket.on('disconnect', (reason) => {
-  console.log('✗ تم قطع الاتصال:', reason);
-});
+  // Emit to all connected gateways (or filter by specific socket ID)
+  io.emit("send_message", messagePayload);
+  console.log("📤 Command sent to Gateway");
+}
 
-socket.on('error', (error) => {
-  console.error('⚠️ خطأ:', error);
-});
-```
-
-### مثال باستخدام Python:
-```python
-from socketio import Client
-
-sio = Client(transports=['websocket', 'polling'])
-
-@sio.event
-def connect():
-    print('✓ متصل بـ بوابة الرسائل')
-
-@sio.event
-def connect_error(data):
-    print('✗ خطأ في الاتصال:', data)
-
-@sio.event
-def disconnect():
-    print('✗ تم قطع الاتصال')
-
-sio.connect('wss://your-server-url',
-            auth={'apiKey': 'YOUR_API_KEY'})
+// Test sending a message after 10 seconds
+setTimeout(() => {
+  sendWhatsApp("+966500000000", "Hello from my custom server!");
+}, 10000);
 ```
 
 ---
 
-## 📤 الأحداث المرسلة من النظام إلى التطبيق
+## 📡 API Reference (Events)
 
-### 1. إرسال رسالة (`send_message`)
+### 1. Server -> App (Commands)
 
-**الوصف:** إرسال أمر من نظام العميل إلى التطبيق لإرسال رسالة SMS أو WhatsApp.
+#### `send_message`
+Emit this event to trigger a message send on the device.
 
-**البيانات المرسلة:**
+**Payload:**
 ```json
 {
-  "id": "msg-12345",
-  "type": "whatsapp",
-  "phoneNumber": "+966501234567",
-  "message": "مرحباً بك في متجرنا",
-  "timestamp": 1678900000000
+  "id": "unique_id_123",
+  "type": "whatsapp", 
+  "phoneNumber": "+96650xxxxxxx",
+  "message": "Your OTP is 1234",
+  "timestamp": 1715421234567
 }
 ```
+*   `type`: Can be `"whatsapp"` or `"sms"`.
 
-**شرح الحقول:**
+### 2. App -> Server (Reports)
 
-| الحقل | النوع | الوصف | مثال |
-|------|------|-------|-------|
-| `id` | string | معرّف فريد للرسالة | `order-001`, `msg-12345` |
-| `type` | string | نوع الرسالة | `"whatsapp"` أو `"sms"` |
-| `phoneNumber` | string | رقم الهاتف (صيغة دولية) | `"+966501234567"` |
-| `message` | string | نص الرسالة | `"تم استلام طلبك"` |
-| `timestamp` | number | وقت الإرسال (milliseconds) | `Date.now()` |
+#### `device_status`
+Sent periodically by the App to report health.
 
-**مثال على الإرسال:**
-```javascript
-socket.emit('send_message', {
-  id: 'order-12345',
-  type: 'whatsapp',
-  phoneNumber: '+966501234567',
-  message: 'طلبك رقم #12345 جاهز للاستلام',
-  timestamp: Date.now()
-});
-```
-
----
-
-## 📥 الأحداث المستقبلة من التطبيق إلى النظام
-
-### 1. حالة الجهاز (`device_status`)
-
-**الوصف:** التطبيق يرسل معلومات حالة الجهاز بشكل دوري.
-
-**البيانات المستقبلة:**
+**Payload:**
 ```json
 {
-  "timestamp": 1678900000000,
-  "platform": "ios",
-  "batteryLevel": 85,
+  "timestamp": 1715421234567,
+  "platform": "android",
+  "batteryLevel": 0.85,
   "batteryState": "charging",
   "isCharging": true,
   "networkType": "wifi",
@@ -154,297 +119,24 @@ socket.emit('send_message', {
 }
 ```
 
-**شرح الحقول:**
+#### `message_response`
+Sent after the App attempts to process a message.
 
-| الحقل | النوع | الوصف | القيم الممكنة |
-|------|------|-------|--------------|
-| `timestamp` | number | وقت الإرسال | - |
-| `platform` | string | نظام التشغيل | `"ios"`, `"android"` |
-| `batteryLevel` | number | مستوى البطارية (0-100) | 0-100 |
-| `batteryState` | string | حالة البطارية | `"charging"`, `"discharging"`, `"full"` |
-| `isCharging` | boolean | هل الجهاز يشحن | `true` / `false` |
-| `networkType` | string | نوع الشبكة | `"wifi"`, `"cellular"`, `"none"` |
-| `isOnline` | boolean | هل الجهاز متصل بالإنترنت | `true` / `false` |
-
-**مثال على الاستقبال:**
-```javascript
-socket.on('device_status', (status) => {
-  console.log('📱 حالة الجهاز:', status);
-  
-  // تسجيل الحالة في قاعدة البيانات
-  logDeviceStatus(status);
-  
-  // تنبيهات مهمة
-  if (status.batteryLevel < 20) {
-    console.warn('⚠️ البطارية منخفضة جداً');
-    sendAlert('البطارية منخفضة');
-  }
-  
-  if (!status.isOnline) {
-    console.warn('⚠️ الجهاز غير متصل بالإنترنت');
-    sendAlert('الجهاز غير متصل');
-  }
-});
-```
-
-### 2. نتيجة الرسالة (`message_response`)
-
-**الوصف:** التطبيق يرسل تقرير عن حالة الرسالة المرسلة.
-
-**البيانات المستقبلة (نجح):**
+**Payload:**
 ```json
 {
-  "messageId": "msg-12345",
-  "status": "sent",
-  "timestamp": 1678900005000
+  "messageId": "unique_id_123",
+  "status": "sent", 
+  "error": null,
+  "timestamp": 1715421239999
 }
 ```
-
-**البيانات المستقبلة (فشل):**
-```json
-{
-  "messageId": "msg-12345",
-  "status": "failed",
-  "error": "رقم الهاتف غير صحيح",
-  "timestamp": 1678900005000
-}
-```
-
-**شرح الحقول:**
-
-| الحقل | النوع | الوصف | القيم الممكنة |
-|------|------|-------|--------------|
-| `messageId` | string | معرّف الرسالة (نفس الـ ID المرسل) | - |
-| `status` | string | حالة الرسالة | `"sent"`, `"failed"`, `"pending"` |
-| `error` | string | رسالة الخطأ (إن وجدت) | - |
-| `timestamp` | number | وقت التقرير | - |
-
-**مثال على الاستقبال:**
-```javascript
-socket.on('message_response', (response) => {
-  console.log('📨 نتيجة الرسالة:', response);
-  
-  if (response.status === 'sent') {
-    console.log(`✓ تم إرسال الرسالة ${response.messageId}`);
-    updateDatabase(response.messageId, 'sent');
-  } else if (response.status === 'failed') {
-    console.error(`✗ فشل الإرسال: ${response.error}`);
-    updateDatabase(response.messageId, 'failed', response.error);
-    // إعادة محاولة أو تنبيه
-    retryMessage(response.messageId);
-  } else if (response.status === 'pending') {
-    console.log(`⏳ الرسالة قيد الانتظار`);
-  }
-});
-```
+*   `status`: `"sent"`, `"failed"`, or `"pending"`.
+*   `error`: Description of failure (if any).
 
 ---
 
-## 🔄 دورة حياة الرسالة
+## 🔒 Security Best Practices
 
-```
-النظام                          التطبيق
-  │                              │
-  ├─ send_message ────────────→  │
-  │                              ├─ معالجة الرسالة
-  │                              ├─ إرسالها عبر WhatsApp/SMS
-  │                              │
-  │  ←─ message_response ────────┤
-  │     (status: sent/failed)     │
-  │                              │
-```
-
----
-
-## 📊 مثال عملي كامل
-
-```javascript
-const io = require('socket.io-client');
-
-// الاتصال بـ Socket.io
-const socket = io('wss://your-server-url', {
-  query: { apiKey: 'YOUR_API_KEY' },
-  transports: ['websocket', 'polling'],
-  reconnection: true,
-  reconnectionDelay: 5000,
-  reconnectionAttempts: 10
-});
-
-// الاتصال الناجح
-socket.on('connect', () => {
-  console.log('✓ متصل بـ بوابة الرسائل');
-  console.log('Client ID:', socket.id);
-});
-
-// استقبال نتيجة الرسالة
-socket.on('message_response', (response) => {
-  if (response.status === 'sent') {
-    console.log(`✓ تم إرسال الرسالة ${response.messageId}`);
-    // تحديث قاعدة البيانات
-    updateMessageStatus(response.messageId, 'sent');
-  } else if (response.status === 'failed') {
-    console.error(`✗ فشل: ${response.error}`);
-    // إعادة محاولة
-    retryMessage(response.messageId);
-  }
-});
-
-// استقبال حالة الجهاز
-socket.on('device_status', (status) => {
-  console.log('📱 حالة الجهاز:', {
-    battery: status.batteryLevel + '%',
-    network: status.networkType,
-    online: status.isOnline
-  });
-});
-
-// معالجة الأخطاء
-socket.on('error', (error) => {
-  console.error('⚠️ خطأ:', error);
-});
-
-// قطع الاتصال
-socket.on('disconnect', (reason) => {
-  console.log('✗ تم قطع الاتصال:', reason);
-});
-
-// دالة لإرسال رسالة
-function sendMessage(phoneNumber, message, type = 'whatsapp') {
-  const messageData = {
-    id: `msg-${Date.now()}`,
-    type: type,
-    phoneNumber: phoneNumber,
-    message: message,
-    timestamp: Date.now()
-  };
-  
-  socket.emit('send_message', messageData);
-  console.log('📤 تم إرسال أمر الرسالة:', messageData.id);
-}
-
-// مثال على الاستخدام
-sendMessage('+966501234567', 'مرحباً بك في متجرنا', 'whatsapp');
-```
-
----
-
-## ⚠️ معالجة الأخطاء والحالات الاستثنائية
-
-### 1. فشل الاتصال الأولي
-```javascript
-socket.on('connect_error', (error) => {
-  console.error('خطأ الاتصال:', error.message);
-  // تحقق من:
-  // - صحة API Key
-  // - صحة Server URL
-  // - الاتصال بالإنترنت
-  // - جدار الحماية (Firewall)
-});
-```
-
-### 2. انقطاع الاتصال المفاجئ
-```javascript
-socket.on('disconnect', (reason) => {
-  if (reason === 'io server disconnect') {
-    // الخادم قطع الاتصال (قد يكون بسبب انتهاء الاشتراك)
-    console.log('الخادم قطع الاتصال');
-    socket.connect();
-  } else if (reason === 'io client namespace disconnect') {
-    // العميل قطع الاتصال
-    console.log('تم قطع الاتصال من قبل العميل');
-  } else {
-    // انقطاع الشبكة أو خطأ آخر
-    console.log('انقطع الاتصال بسبب:', reason);
-  }
-});
-```
-
-### 3. إعادة محاولة الرسائل الفاشلة
-```javascript
-const failedMessages = [];
-
-socket.on('message_response', (response) => {
-  if (response.status === 'failed') {
-    failedMessages.push({
-      messageId: response.messageId,
-      error: response.error,
-      retries: 0
-    });
-    
-    // إعادة محاولة بعد 30 ثانية
-    setTimeout(() => {
-      const message = getMessageById(response.messageId);
-      if (message) {
-        socket.emit('send_message', message);
-      }
-    }, 30000);
-  }
-});
-```
-
----
-
-## 🔒 أفضل الممارسات الأمنية
-
-1. **حماية API Key:**
-   - لا تضع API Key في الكود الأمامي (Frontend)
-   - استخدمه فقط على الخادم الخاص بك
-   - غيّره بشكل دوري من لوحة التحكم
-   - استخدم متغيرات البيئة
-
-2. **التحقق من البيانات:**
-   ```javascript
-   function validateMessage(message) {
-     if (!message.id || !message.type || !message.phoneNumber || !message.message) {
-       throw new Error('بيانات الرسالة غير كاملة');
-     }
-     
-     if (!['whatsapp', 'sms'].includes(message.type)) {
-       throw new Error('نوع الرسالة غير صحيح');
-     }
-     
-     if (!message.phoneNumber.match(/^\+\d{10,15}$/)) {
-       throw new Error('صيغة رقم الهاتف غير صحيحة');
-     }
-     
-     if (message.message.length > 1000) {
-       throw new Error('الرسالة طويلة جداً');
-     }
-     
-     return true;
-   }
-   ```
-
-3. **تسجيل العمليات (Logging):**
-   ```javascript
-   socket.on('send_message', (message) => {
-     console.log(`[${new Date().toISOString()}] إرسال رسالة:`, {
-       id: message.id,
-       type: message.type,
-       phoneNumber: message.phoneNumber.substring(0, 5) + '***',
-       timestamp: message.timestamp
-     });
-   });
-   ```
-
----
-
-## 🚀 الخطوات التالية
-
-1. **اختبر الاتصال** باستخدام أداة مثل Postman أو Socket.io Tester
-2. **راقب السجلات** (Logs) للتأكد من أن كل شيء يعمل بشكل صحيح
-3. **اقرأ دليل الميزات** (CLIENT_FEATURES_GUIDE.md) لفهم جميع الإمكانيات
-4. **تواصل مع الدعم** إذا واجهت أي مشاكل
-
----
-
-## 📞 الدعم والمساعدة
-
-للحصول على المساعدة:
-- **البريد الإلكتروني:** support@idea-solutions.com
-- **الهاتف:** +966-1-XXXX-XXXX
-- **الموقع:** https://idea-solutions.com/support
-
----
-
-**ملاحظة:** هذا المستند يتم تحديثه بشكل مستمر مع كل تحديث للتطبيق. تأكد من قراءة أحدث نسخة.
+1.  **Authentication**: Implement a handshake authentication mechanism (e.g., require the App to send a secret token in the query params) to prevent unauthorized devices from connecting to your server.
+2.  **SSL/TLS**: Always use `wss://` (HTTPS) in production to encrypt the communication.

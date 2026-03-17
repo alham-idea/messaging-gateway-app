@@ -1,84 +1,36 @@
-# دليل الميزات والاستفادة القصوى - بوابة الرسائل
+# Client Features Guide
 
-**الإصدار:** 1.0  
-**آخر تحديث:** مارس 2026  
-**المالك:** آيديا للاستشارات والحلول التسويقية والتقنية
-
----
-
-## 📋 نظرة عامة
-
-**بوابة الرسائل** هي تطبيق موبايل متكامل يمكّن الشركات والمتاجر والمؤسسات من إرسال رسائل **SMS** و **WhatsApp** إلى عملائهم من خلال هاتفهم الذكي. التطبيق يعمل كبوابة اتصال آمنة وموثوقة بين نظام الشركة وعملائها.
+## Overview
+Messaging Gateway is a comprehensive mobile application enabling businesses to send **SMS** and **WhatsApp** messages to their customers directly from their smartphones. It acts as a secure bridge between your business system and your customers.
 
 ---
 
-## 🎯 الميزات الرئيسية
+## 🎯 Key Features
 
-### 1. إرسال رسائل SMS
+### 1. WhatsApp Messaging
+Send messages via WhatsApp through your customer's phone using WhatsApp Web automation.
+*   **Use Cases**: Order confirmations, Customer support, OTPs.
 
-إرسال رسائل نصية قصيرة (SMS) إلى أرقام الهواتف بشكل فوري وموثوق مع تقارير التسليم الفورية.
+### 2. SMS Messaging
+Send native SMS messages directly from the device's SIM card.
+*   **Use Cases**: Critical alerts, Offline notifications.
 
-**الاستخدامات:** تأكيد الطلبات، رموز التحقق، إخطارات الشحن، تنبيهات الحسابات.
+### 3. Decentralized Architecture (BYOD)
+You host the Socket.io server. Your data flows directly from your backend to your device. No third-party data interception.
 
-### 2. إرسال رسائل WhatsApp
+### 4. Local Message Queue
+The app maintains a local queue for pending messages, ensuring delivery even if the internet connection fluctuates.
 
-إرسال رسائل عبر تطبيق WhatsApp من خلال هاتف العميل مع دعم قراءة الرسائل.
+### 5. Device Health Monitoring
+Real-time monitoring of battery level, network status, and charging state to ensure gateway reliability.
 
-**الاستخدامات:** تأكيد الطلبات، دعم العملاء، إرسال الفواتير، إخطارات الحملات التسويقية.
-
-### 3. طابور الرسائل المحلي
-
-التطبيق يحتفظ بطابور محلي للرسائل المعلقة والفاشلة مع إعادة محاولة تلقائية عند استعادة الاتصال.
-
-### 4. التقارير والإحصائيات
-
-الحصول على تقارير مفصلة عن الرسائل المرسلة (عدد الناجحة والفاشلة، معدل التسليم).
-
-### 5. مراقبة حالة الجهاز
-
-التطبيق يراقب حالة الجهاز ويرسل تحديثات دورية (البطارية، الشبكة، الاتصال بالإنترنت).
-
-### 6. الاشتراكات والخطط
-
-اختيار خطة اشتراك مناسبة (Basic, Professional, Enterprise) مع رسائل شهرية محددة.
-
-### 7. الأمان والخصوصية
-
-حماية البيانات بتشفير TLS 1.3 ومصادقة عبر API Key فريد.
+### 6. Subscription Plans
+Flexible plans managed via the Idea Backend (Basic, Professional, Enterprise) to suit different business needs.
 
 ---
 
-## 💡 حالات الاستخدام
+## 🚀 Best Practices
 
-### المتاجر الإلكترونية
-إرسال تأكيدات الطلبات والشحن والتسليم.
-
-### المستشفيات والعيادات
-تذكيرات المواعيد والنتائج الطبية.
-
-### البنوك والمؤسسات المالية
-تنبيهات الحسابات والعمليات المالية وأكواد التحقق.
-
-### شركات الخدمات اللوجستية
-تتبع الشحنات والتسليم.
-
----
-
-## 🚀 أفضل الممارسات
-
-1. **التحقق من صيغة الأرقام** - استخدم صيغة دولية (+966...)
-2. **إدارة الرسائل الفاشلة** - أعد المحاولة تلقائياً حتى 3 مرات
-3. **تسجيل العمليات** - احفظ سجلات كاملة لكل رسالة
-4. **معالجة انقطاع الاتصال** - احفظ الرسائل المعلقة وأرسلها عند استعادة الاتصال
-
----
-
-## 📞 الدعم والمساعدة
-
-- **البريد الإلكتروني:** support@idea-solutions.com
-- **الهاتف:** +966-1-XXXX-XXXX
-- **الموقع:** https://idea-solutions.com/support
-
----
-
-**ملاحظة:** هذا المستند يتم تحديثه بشكل مستمر مع كل تحديث للتطبيق.
+1.  **Phone Number Format**: Always use international format (e.g., +966...).
+2.  **Device Maintenance**: Keep the gateway device plugged into power and connected to Wi-Fi.
+3.  **Screen Lock**: Disable screen lock or use a long timeout to prevent the OS from killing the background process (though the app uses WakeLocks).

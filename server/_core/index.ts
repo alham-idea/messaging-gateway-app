@@ -54,10 +54,20 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
+  // Serve admin dashboard
+  app.use("/admin", express.static("public/admin"));
+  app.get("/admin/*", (_req, res) => {
+    res.sendFile("public/admin/index.html", { root: process.cwd() });
+  });
+
   registerOAuthRoutes(app);
 
   app.get("/api/health", (_req, res) => {
-    res.json({ ok: true, timestamp: Date.now() });
+    res.json({ 
+      ok: true, 
+      timestamp: Date.now(),
+      admin: "http://localhost:" + port + "/admin"
+    });
   });
 
   app.use(
@@ -77,6 +87,7 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
+    console.log(`[admin] dashboard available at http://localhost:${port}/admin`);
   });
 }
 

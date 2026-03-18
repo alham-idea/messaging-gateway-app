@@ -12,7 +12,7 @@ export interface DBMessage extends MessagePayload {
 }
 
 class DatabaseService {
-  private db: SQLite.SQLiteDatabase | null = null;
+  private db: any | null = null;
 
   /**
    * Initialize database
@@ -78,7 +78,7 @@ class DatabaseService {
   public async getPendingMessages(limit: number = 10): Promise<DBMessage[]> {
     if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
 
-    const result = await this.db.getAllAsync<DBMessage>(
+    const result = await this.db.getAllAsync(
       `SELECT * FROM messages WHERE status = 'pending' ORDER BY createdAt ASC LIMIT ?`,
       [limit]
     );
@@ -129,19 +129,22 @@ class DatabaseService {
   public async getStats(): Promise<{ pending: number; failed: number; sent: number }> {
     if (!this.db) return { pending: 0, failed: 0, sent: 0 };
 
-    const result = await this.db.getFirstAsync<{
-      pending: number;
-      failed: number;
-      sent: number;
-    }>(`
+    const result = await this.db.getFirstAsync(`
       SELECT 
         COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
         COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
         COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent
       FROM messages
-    `);
+    `) as any;
 
     return result || { pending: 0, failed: 0, sent: 0 };
+  }
+
+  /**
+   * Clear history
+   */
+  public async clearHistory(): Promise<void> {
+    await this.clearAll();
   }
 }
 

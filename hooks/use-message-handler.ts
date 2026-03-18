@@ -43,16 +43,17 @@ export function useMessageHandler() {
   const [whatsappEvents, setWhatsappEvents] = useState<WhatsAppMessageEvent[]>([]);
 
   // تحديث الإحصائيات الشاملة
-  const updateStats = useCallback(() => {
-    const socketStats = messageHandlerService.getStats();
+  const updateStats = useCallback(async () => {
+    const socketStats = await messageHandlerService.getStats();
     const whatsappStats = whatsAppDesktopService.getStats();
+    const total = socketStats.sent + socketStats.failed;
 
     setStats({
-      totalProcessed: socketStats.totalProcessed,
+      totalProcessed: total,
       sent: socketStats.sent,
       failed: socketStats.failed,
       pending: socketStats.pending,
-      successRate: socketStats.successRate,
+      successRate: total > 0 ? (socketStats.sent / total) * 100 : 0,
       whatsappReady: whatsappStats.isReady,
       whatsappDesktop: whatsappStats.isDesktop,
       whatsappPending: whatsappStats.pendingMessages,
@@ -170,7 +171,7 @@ export function useMessageHandler() {
     );
 
     // تحديث الإحصائيات كل 3 ثوان
-    const interval = setInterval(updateStats, 3000);
+    const interval = setInterval(() => updateStats(), 3000);
 
     return () => {
       clearInterval(interval);
@@ -180,7 +181,7 @@ export function useMessageHandler() {
 
   // تحديث أولي
   useEffect(() => {
-    updateStats();
+    void updateStats();
   }, [updateStats]);
 
   return {

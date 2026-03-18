@@ -31,9 +31,10 @@ export function useBackgroundService() {
   const [error, setError] = useState<string | null>(null);
 
   // تحديث حالة الخدمة
-  const updateStatus = useCallback(() => {
-    const serviceStats = backgroundService.getServiceStats();
+  const updateStatus = useCallback(async () => {
+    const serviceStats = await backgroundService.getServiceStats();
     const messageStats = serviceStats.messageStats;
+    const total = messageStats.sent + messageStats.failed;
 
     setStatus({
       isRunning: serviceStats.isRunning,
@@ -43,7 +44,7 @@ export function useBackgroundService() {
       pendingMessages: messageStats.pending,
       sentMessages: messageStats.sent,
       failedMessages: messageStats.failed,
-      successRate: messageStats.successRate,
+      successRate: total > 0 ? (messageStats.sent / total) * 100 : 0,
     });
   }, []);
 
@@ -104,9 +105,10 @@ export function useBackgroundService() {
     }
   }, [updateStatus]);
 
-  // تحديث الحالة كل 5 ثوان
+  // تحديث حالة الخدمة بشكل دوري
   useEffect(() => {
-    const interval = setInterval(updateStatus, 5000);
+    void updateStatus();
+    const interval = setInterval(() => void updateStatus(), 5000);
     return () => clearInterval(interval);
   }, [updateStatus]);
 

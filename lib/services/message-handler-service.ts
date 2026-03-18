@@ -217,6 +217,35 @@ class MessageHandlerService {
     
     socketService.sendMessageResponse(response);
   }
+
+  /**
+   * Get statistics
+   */
+  public async getStats() {
+    return await databaseService.getStats();
+  }
+
+  /**
+   * Get pending message count
+   */
+  public async getPendingMessageCount(): Promise<number> {
+    const stats = await databaseService.getStats();
+    return stats.pending;
+  }
+
+  /**
+   * Clear message history
+   */
+  public async clearHistory(): Promise<void> {
+    await databaseService.clearHistory();
+  }
+
+  /**
+   * Get message history
+   */
+  public getMessageHistory() {
+    return [];
+  }
 }
 
 export const messageHandlerService = new MessageHandlerService();

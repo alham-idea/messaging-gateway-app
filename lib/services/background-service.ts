@@ -101,7 +101,7 @@ class BackgroundService {
           await deviceStatusService.startMonitoring();
 
           // معالجة الرسائل المعلقة
-          const stats = messageHandlerService.getStats();
+          const stats = await messageHandlerService.getStats();
           console.log(`📊 إحصائيات الرسائل: ${stats.sent} مرسلة، ${stats.pending} معلقة`);
 
           return BackgroundFetch.BackgroundFetchResult.NewData;
@@ -233,12 +233,12 @@ class BackgroundService {
   /**
    * الحصول على إحصائيات الخدمة
    */
-  public getServiceStats() {
+  public async getServiceStats() {
     return {
       isRunning: this.isRunning,
       reconnectAttempts: this.reconnectAttempts,
       maxReconnectAttempts: this.maxReconnectAttempts,
-      messageStats: messageHandlerService.getStats(),
+      messageStats: await messageHandlerService.getStats(),
       socketConnected: socketService.isConnected(),
     };
   }

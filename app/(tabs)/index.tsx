@@ -24,6 +24,7 @@ export default function HomeScreen() {
   const [networkType, setNetworkType] = useState('unknown');
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [queueCount, setQueueCount] = useState(0);
+  const [queueStats, setQueueStats] = useState({ pending: 0, sent: 0, failed: 0 });
 
   useEffect(() => {
     checkConnection();
@@ -53,6 +54,11 @@ export default function HomeScreen() {
     setBatteryLevel(deviceStatusService.getBatteryPercentage());
     setNetworkType(deviceStatus.networkType);
     setQueueCount(status.pendingMessages);
+    setQueueStats({
+      pending: status.pendingMessages,
+      sent: status.sentMessages,
+      failed: status.failedMessages,
+    });
 
     // إضافة سجل
     if (socketService.isConnected()) {

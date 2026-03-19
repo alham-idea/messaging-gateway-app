@@ -110,9 +110,9 @@ const Users: React.FC = () => {
                           <span className="text-xs">{device.deviceType || 'غير معروف'}</span>
                           <span className="text-xs text-gray-400">({device.phoneNumber || 'لا يوجد رقم'})</span>
                           {device.status === 'online' ? (
-                            <Wifi className="w-4 h-4 text-green-500" title="متصل" />
+                            <Wifi className="w-4 h-4 text-green-500" />
                           ) : (
-                            <WifiOff className="w-4 h-4 text-red-500" title="غير متصل" />
+                            <WifiOff className="w-4 h-4 text-red-500" />
                           )}
                         </div>
                       ))}

@@ -98,8 +98,15 @@ export const adminRouter = router({
         const total = filtered.length;
         const items = filtered.slice(input.offset, input.offset + input.limit);
 
+        const allDevices = await db.getAllDevices();
+        
+        const itemsWithDevices = items.map((u: any) => ({
+          ...u,
+          devices: allDevices.filter(d => d.userId === u.id)
+        }));
+
         return {
-          items,
+          items: itemsWithDevices,
           total,
           limit: input.limit,
           offset: input.offset,
@@ -288,30 +295,100 @@ export const adminRouter = router({
     .input(
       z.object({
         subscriptionId: z.number(),
-        status: z.enum(["active", "cancelled", "expired", "suspended"]),
+        status: z.enum(["active", "inactive", "suspended", "expired", "cancelled"]),
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can update subscription status",
-          });
-        }
-
-        await db.updateUserSubscription(input.subscriptionId, {
-          status: input.status,
-        });
-
-        return { success: true };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to update subscription status",
-        });
+      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
       }
+      // Assuming db.updateSubscriptionStatus exists, if not we will use db.updateUserSubscription
+      const dbInstance = await db.getDb();
+      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      
+      const { userSubscriptions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await dbInstance.update(userSubscriptions)
+        .set({ status: input.status })
+        .where(eq(userSubscriptions.id, input.subscriptionId));
+        
+      return { success: true };
+    }),
+
+  updateSubscriptionPlan: protectedProcedure
+    .input(z.object({ subscriptionId: z.number(), planId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      const dbInstance = await db.getDb();
+      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      
+      const { userSubscriptions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      await dbInstance.update(userSubscriptions)
+        .set({ planId: input.planId })
+        .where(eq(userSubscriptions.id, input.subscriptionId));
+        
+      return { success: true };
+    }),
+
+  extendSubscription: protectedProcedure
+    .input(z.object({ subscriptionId: z.number(), days: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      const dbInstance = await db.getDb();
+      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      
+      const { userSubscriptions } = await import("../../drizzle/schema");
+      const { eq } = await import("drizzle-orm");
+      
+      const sub = await dbInstance.select().from(userSubscriptions).where(eq(userSubscriptions.id, input.subscriptionId)).limit(1);
+      if (!sub || sub.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
+      
+      const currentEndDate = new Date(sub[0].endDate || new Date());
+      currentEndDate.setDate(currentEndDate.getDate() + input.days);
+      
+      await dbInstance.update(userSubscriptions)
+        .set({ endDate: currentEndDate })
+        .where(eq(userSubscriptions.id, input.subscriptionId));
+        
+      return { success: true, newEndDate: currentEndDate };
+    }),
+
+  resetSubscriptionQuota: protectedProcedure
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      const dbInstance = await db.getDb();
+      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      
+      const { usageStatistics } = await import("../../drizzle/schema");
+      const { eq, and, gte } = await import("drizzle-orm");
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Reset today's stats for this user
+      await dbInstance.update(usageStatistics)
+        .set({ 
+          whatsappMessagesSent: 0, 
+          smsMessagesSent: 0 
+        })
+        .where(
+          and(
+            eq(usageStatistics.userId, input.userId),
+            gte(usageStatistics.date, today)
+          )
+        );
+        
+      return { success: true };
     }),
 
   /**

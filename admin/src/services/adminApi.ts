@@ -97,6 +97,42 @@ export const adminApi = {
     }
   },
 
+  updateSubscriptionPlan: async (subscriptionId: number, planId: number) => {
+    try {
+      const response = await apiClient.post('/api/trpc/admin.updateSubscriptionPlan', {
+        json: { subscriptionId, planId },
+      });
+      return response.data.result.data;
+    } catch (error) {
+      console.error('Error updating subscription plan:', error);
+      throw error;
+    }
+  },
+
+  extendSubscription: async (subscriptionId: number, days: number) => {
+    try {
+      const response = await apiClient.post('/api/trpc/admin.extendSubscription', {
+        json: { subscriptionId, days },
+      });
+      return response.data.result.data;
+    } catch (error) {
+      console.error('Error extending subscription:', error);
+      throw error;
+    }
+  },
+
+  resetSubscriptionQuota: async (userId: number) => {
+    try {
+      const response = await apiClient.post('/api/trpc/admin.resetSubscriptionQuota', {
+        json: { userId },
+      });
+      return response.data.result.data;
+    } catch (error) {
+      console.error('Error resetting quota:', error);
+      throw error;
+    }
+  },
+
   /**
    * Invoices Management
    */

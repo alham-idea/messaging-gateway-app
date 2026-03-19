@@ -175,11 +175,7 @@ class WhatsAppDesktopService {
     while (this.messageQueue.length > 0) {
       const msg = this.messageQueue.shift();
       if (msg) {
-        // إضافة تأخير عشوائي بين 30-60 ثانية
-        const delay = Math.random() * 30000 + 30000;
-        setTimeout(() => {
-          this.sendMessage(msg.phoneNumber, msg.message, msg.messageId);
-        }, delay);
+        this.sendMessage(msg.phoneNumber, msg.message, msg.messageId);
       }
     }
   }

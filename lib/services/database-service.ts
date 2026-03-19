@@ -4,11 +4,18 @@ import { MessagePayload } from './socket-service';
 const DB_NAME = 'messaging_gateway.db';
 
 export interface DBMessage extends MessagePayload {
-  status: 'pending' | 'processing' | 'sent' | 'failed';
+  status: 'pending' | 'processing' | 'sent' | 'failed' | 'received';
+  direction: 'outbound' | 'inbound';
   error?: string;
   createdAt: number;
   updatedAt: number;
   retryCount: number;
+}
+
+export interface MessageCounts {
+  whatsapp: number;
+  sms: number;
+  total: number;
 }
 
 class DatabaseService {
@@ -21,6 +28,7 @@ class DatabaseService {
     try {
       this.db = await SQLite.openDatabaseAsync(DB_NAME);
       await this.createTables();
+      await this.migrateTables();
       console.log('✓ تم تهيئة قاعدة البيانات بنجاح');
     } catch (error) {
       console.error('❌ خطأ في تهيئة قاعدة البيانات:', error);
@@ -41,6 +49,7 @@ class DatabaseService {
         phoneNumber TEXT NOT NULL,
         message TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending',
+        direction TEXT NOT NULL DEFAULT 'outbound',
         error TEXT,
         retryCount INTEGER DEFAULT 0,
         timestamp INTEGER NOT NULL,
@@ -51,20 +60,44 @@ class DatabaseService {
   }
 
   /**
+   * Migrate tables to add new columns
+   */
+  private async migrateTables(): Promise<void> {
+    if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
+
+    try {
+      // Check if direction column exists
+      const result = await this.db.getAllAsync("PRAGMA table_info(messages)");
+      const hasDirection = result.some((col: any) => col.name === 'direction');
+
+      if (!hasDirection) {
+        console.log('🔄 Adding direction column to messages table...');
+        await this.db.execAsync("ALTER TABLE messages ADD COLUMN direction TEXT NOT NULL DEFAULT 'outbound'");
+      }
+    } catch (error) {
+      console.error('Error migrating tables:', error);
+    }
+  }
+
+  /**
    * Add message to queue
    */
-  public async addMessage(payload: MessagePayload): Promise<void> {
+  public async addMessage(payload: MessagePayload, direction: 'outbound' | 'inbound' = 'outbound'): Promise<void> {
     if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
 
     const now = Date.now();
+    const status = direction === 'inbound' ? 'received' : 'pending';
+    
     await this.db.runAsync(
-      `INSERT OR REPLACE INTO messages (id, type, phoneNumber, message, status, timestamp, createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+      `INSERT OR REPLACE INTO messages (id, type, phoneNumber, message, status, direction, timestamp, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         payload.id,
         payload.type,
         payload.phoneNumber,
         payload.message,
+        status,
+        direction,
         payload.timestamp,
         now,
         now
@@ -99,9 +132,12 @@ class DatabaseService {
     const now = Date.now();
     await this.db.runAsync(
       `UPDATE messages 
-       SET status = ?, error = ?, updatedAt = ?, retryCount = retryCount + 1 
+       SET status = ?, 
+           error = ?, 
+           updatedAt = ?, 
+           retryCount = CASE WHEN ? = 'failed' THEN retryCount + 1 ELSE retryCount END
        WHERE id = ?`,
-      [status, error || null, now, id]
+      [status, error || null, now, status, id]
     );
   }
 
@@ -138,6 +174,69 @@ class DatabaseService {
     `) as any;
 
     return result || { pending: 0, failed: 0, sent: 0 };
+  }
+
+  /**
+   * Get sent messages counts within a period
+   */
+  public async getSentCounts(periodStart: number, periodEnd: number): Promise<MessageCounts> {
+    if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
+
+    const row = await this.db.getFirstAsync(
+      `
+      SELECT
+        SUM(CASE WHEN type = 'whatsapp' AND status = 'sent' AND direction = 'outbound' AND updatedAt BETWEEN ? AND ? THEN 1 ELSE 0 END) AS whatsapp,
+        SUM(CASE WHEN type = 'sms' AND status = 'sent' AND direction = 'outbound' AND updatedAt BETWEEN ? AND ? THEN 1 ELSE 0 END) AS sms
+      FROM messages
+      `,
+      [periodStart, periodEnd, periodStart, periodEnd]
+    ) as any;
+
+    const whatsapp = Number(row?.whatsapp ?? 0);
+    const sms = Number(row?.sms ?? 0);
+    return {
+      whatsapp,
+      sms,
+      total: whatsapp + sms,
+    };
+  }
+
+  /**
+   * Get received messages counts within a period
+   */
+  public async getReceivedCounts(periodStart: number, periodEnd: number): Promise<MessageCounts> {
+    if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
+
+    const row = await this.db.getFirstAsync(
+      `
+      SELECT
+        SUM(CASE WHEN type = 'whatsapp' AND direction = 'inbound' AND updatedAt BETWEEN ? AND ? THEN 1 ELSE 0 END) AS whatsapp,
+        SUM(CASE WHEN type = 'sms' AND direction = 'inbound' AND updatedAt BETWEEN ? AND ? THEN 1 ELSE 0 END) AS sms
+      FROM messages
+      `,
+      [periodStart, periodEnd, periodStart, periodEnd]
+    ) as any;
+
+    const whatsapp = Number(row?.whatsapp ?? 0);
+    const sms = Number(row?.sms ?? 0);
+    return {
+      whatsapp,
+      sms,
+      total: whatsapp + sms,
+    };
+  }
+
+  /**
+   * Get recent messages
+   */
+  public async getRecentMessages(limit: number = 20): Promise<DBMessage[]> {
+    if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
+
+    const result = await this.db.getAllAsync(
+      `SELECT * FROM messages ORDER BY createdAt DESC LIMIT ?`,
+      [limit]
+    );
+    return result as DBMessage[];
   }
 
   /**

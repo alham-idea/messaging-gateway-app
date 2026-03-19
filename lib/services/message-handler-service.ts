@@ -1,8 +1,10 @@
 import { socketService, MessagePayload, MessageResponse } from './socket-service';
 import { whatsAppService } from './whatsapp-service';
-import * as SMS from 'expo-sms';
+import { smsService, SmsMessage } from './sms-service';
 import { Platform } from 'react-native';
 import { databaseService } from './database-service';
+import { subscriptionClientService } from './subscription-client-service';
+import { settingsService } from './settings-service';
 
 export interface ProcessedMessage {
   id: string;
@@ -25,6 +27,12 @@ class MessageHandlerService {
     try {
       await databaseService.init();
       this.isInitialized = true;
+      
+      // Start SMS listener
+      if (Platform.OS === 'android') {
+        smsService.startListener(this.handleIncomingSms.bind(this));
+      }
+
       // Resume processing pending messages
       this.processQueue();
     } catch (error) {
@@ -33,16 +41,34 @@ class MessageHandlerService {
   }
 
   /**
-   * Handle incoming message from Socket
+   * Handle incoming message from Socket (Outbound)
    */
   public async handleIncomingMessage(payload: MessagePayload): Promise<void> {
     console.log('📨 Received message:', payload);
 
     try {
-      // Save to database (Persistent Queue)
-      await databaseService.addMessage(payload);
+      // 1. Strict channel check - no fallback logic here
+      if (payload.type !== 'whatsapp' && payload.type !== 'sms') {
+        throw new Error(`Invalid message type: ${payload.type}`);
+      }
+
+      // 2. Check Quota
+      const canSend = await subscriptionClientService.canSendMessage(payload.type);
+      if (!canSend) {
+        this.sendResponse({
+          id: payload.id,
+          payload,
+          status: 'failed',
+          error: 'quota_exceeded',
+          timestamp: Date.now()
+        });
+        return;
+      }
+
+      // 3. Save to database (Persistent Queue)
+      await databaseService.addMessage(payload, 'outbound');
       
-      // Trigger processing
+      // 4. Trigger processing
       this.processQueue();
     } catch (error) {
       console.error('❌ Failed to queue message:', error);
@@ -50,10 +76,65 @@ class MessageHandlerService {
         id: payload.id,
         payload,
         status: 'failed',
-        error: 'Failed to save message to queue',
+        error: error instanceof Error ? error.message : 'Failed to save message to queue',
         timestamp: Date.now()
       });
     }
+  }
+
+  /**
+   * Handle incoming SMS from Device (Inbound)
+   */
+  public async handleIncomingSms(sms: SmsMessage): Promise<void> {
+    console.log('📨 Incoming SMS received:', sms);
+    
+    try {
+      // 1. Save to DB as inbound
+      const payload: MessagePayload = {
+        id: sms.id,
+        type: 'sms',
+        phoneNumber: sms.address,
+        message: sms.body,
+        timestamp: sms.date
+      };
+      
+      await databaseService.addMessage(payload, 'inbound');
+      
+      // 2. Emit to Socket (Sync with Client)
+      // Note: We might want to check quota here too if "receiving" is limited
+      // For now, we assume receiving is allowed but counted
+      
+      socketService.emit('sms_received', payload);
+      
+    } catch (error) {
+      console.error('Failed to handle incoming SMS:', error);
+    }
+  }
+  
+  /**
+   * Handle incoming WhatsApp from WebView (Inbound)
+   */
+  public async handleIncomingWhatsApp(message: any): Promise<void> {
+     // This is called by useMessageHandler currently, but should be centralized here
+     // or at least logic shared.
+     // For now, let's expose a method to be called by the UI/Service listener
+     
+     const payload: MessagePayload = {
+        id: message.id || `wa_${Date.now()}`,
+        type: 'whatsapp',
+        phoneNumber: message.phoneNumber,
+        message: message.message,
+        timestamp: message.timestamp || Date.now()
+      };
+
+      try {
+        await databaseService.addMessage(payload, 'inbound');
+        // socketService.emit('whatsapp_message_received', payload); // Already emitted in WhatsAppService?
+        // Let's check WhatsAppService. It emits 'whatsapp_message_received'.
+        // We just need to ensure DB tracking.
+      } catch (error) {
+        console.error('Failed to track incoming WhatsApp:', error);
+      }
   }
 
   /**
@@ -70,17 +151,27 @@ class MessageHandlerService {
 
       if (messages.length > 0) {
         const message = messages[0];
+        
+        // Ensure we only process outbound messages here (status='pending')
+        // DB query filters by status='pending', which is default for outbound.
+        // Inbound are 'received'.
+        
         await this.processMessage(message);
         
         // Process next message after delay
         if (messages.length > 0) {
-            // Random delay 5-15 seconds to avoid spam detection
-            const delay = Math.random() * 10000 + 5000;
-            setTimeout(() => {
-                this.isProcessing = false;
-                this.processQueue();
-            }, delay);
-            return; // Exit here, let timeout handle next loop
+          const enableRandom = settingsService.getSetting('enableRandomDelay');
+          const minDelay = settingsService.getSetting('minRandomDelay'); // ثواني
+          const maxDelay = settingsService.getSetting('maxRandomDelay'); // ثواني
+          const delayMs = enableRandom
+            ? Math.floor((Math.random() * (maxDelay - minDelay) + minDelay) * 1000)
+            : 0;
+
+          setTimeout(() => {
+            this.isProcessing = false;
+            this.processQueue();
+          }, delayMs);
+          return; // Exit here, let timeout handle next loop
         }
       }
     } catch (error) {
@@ -185,23 +276,8 @@ class MessageHandlerService {
    * Send via SMS
    */
   private async sendViaSMS(payload: MessagePayload): Promise<void> {
-    if (Platform.OS === 'web') {
-      throw new Error('SMS not supported on web');
-    }
-
-    const isAvailable = await SMS.isAvailableAsync();
-    if (!isAvailable) {
-      throw new Error('SMS service not available on this device');
-    }
-
-    const { result } = await SMS.sendSMSAsync(
-      [payload.phoneNumber],
-      payload.message
-    );
-
-    if (result !== 'sent' && result !== 'unknown') {
-      throw new Error(`SMS send failed: ${result}`);
-    }
+    // Use the new SmsService
+    await smsService.sendSms(payload.phoneNumber, payload.message);
   }
 
   /**

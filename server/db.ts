@@ -1,6 +1,6 @@
 import { eq, and, or, desc, asc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers, userSubscriptions, subscriptionHistory, paymentMethods, refunds, notifications, notificationPreferences, emailQueue, notificationHistory } from "../drizzle/schema";
+import { InsertUser, users, subscriptionPlans, payments, invoices, usageStatistics, coupons, adminUsers, userSubscriptions, subscriptionHistory, paymentMethods, refunds, notifications, notificationPreferences, emailQueue, notificationHistory, devices } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import * as bcrypt from "bcrypt";
 
@@ -78,6 +78,30 @@ export async function updateUser(id: number, updates: Partial<InsertUser>) {
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   return bcrypt.compare(password, hash);
+}
+
+/**
+ * Devices Management
+ */
+export async function getAllDevices() {
+  const db = await getDb();
+  if (!db) return [];
+  try {
+    return await db.select().from(devices);
+  } catch (error) {
+    // Return empty if table doesn't exist yet
+    return [];
+  }
+}
+
+export async function getUserDevices(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  try {
+    return await db.select().from(devices).where(eq(devices.userId, userId));
+  } catch (error) {
+    return [];
+  }
 }
 
 /**

@@ -6,6 +6,8 @@ import { socketService } from './socket-service';
 import { deviceStatusService } from './device-status-service';
 import { messageHandlerService } from './message-handler-service';
 
+import { smsService } from './sms-service';
+
 const BACKGROUND_TASK_NAME = 'messaging-gateway-background-task';
 const BACKGROUND_FETCH_INTERVAL = 60; // كل دقيقة
 
@@ -30,6 +32,7 @@ class BackgroundService {
   private statusCheckInterval: ReturnType<typeof setInterval> | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
+  private hasSyncedSms = false;
 
   /**
    * تهيئة خدمة الخلفية
@@ -60,12 +63,42 @@ class BackgroundService {
 
       // بدء مراقبة الحالة
       this.startStatusMonitoring();
+      
+      // مزامنة SMS عند البدء (مرة واحدة)
+      if (!this.hasSyncedSms && Platform.OS === 'android') {
+        this.syncSmsHistory();
+      }
 
       this.isRunning = true;
       console.log('✓ تم تهيئة خدمة الخلفية بنجاح');
     } catch (error) {
       console.error('❌ خطأ في تهيئة خدمة الخلفية:', error);
       throw error;
+    }
+  }
+
+  /**
+   * مزامنة تاريخ SMS
+   */
+  private async syncSmsHistory(): Promise<void> {
+    try {
+      console.log('📥 بدء مزامنة تاريخ SMS...');
+      const messages = await smsService.getLastMessages(50);
+      
+      if (messages.length > 0) {
+        console.log(`📥 تم جلب ${messages.length} رسالة SMS`);
+        // إرسالها إلى المنصة (يمكن تجميعها أو إرسالها واحدة تلو الأخرى)
+        // هنا نرسلها كحدث 'sms_history_sync'
+        if (socketService.isConnected()) {
+           socketService.emit('sms_history_sync', { messages });
+           this.hasSyncedSms = true;
+        } else {
+           // إذا لم يكن متصلاً، ننتظر حتى الاتصال (يمكن التعامل معها في مراقب الاتصال)
+           console.log('⏳ تأجيل المزامنة لحين الاتصال');
+        }
+      }
+    } catch (error) {
+      console.error('❌ خطأ في مزامنة SMS:', error);
     }
   }
 
@@ -95,6 +128,11 @@ class BackgroundService {
           if (!socketService.isConnected()) {
             console.log('🔌 محاولة إعادة الاتصال');
             await this.attemptReconnect();
+          }
+
+          // مزامنة SMS عند كل دورة خلفية (لضمان التقاط ما فات)
+          if (Platform.OS === 'android') {
+             await this.syncSmsHistory();
           }
 
           // تحديث حالة الجهاز

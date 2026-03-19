@@ -31,6 +31,8 @@ export interface MessageResponse {
   timestamp: number;
 }
 
+import { messageHandlerService } from './message-handler-service';
+
 class SocketService {
   private socket: Socket | null = null;
   private socketUrl: string = '';
@@ -207,10 +209,9 @@ class SocketService {
   /**
    * معالجة الرسائل الواردة من المنصة
    */
-  private handleIncomingMessage(payload: MessagePayload): void {
-    // سيتم استدعاء خدمة معالجة الرسائل
-    console.log('معالجة الرسالة الواردة:', payload);
-    // سيتم تنفيذ هذا في الخدمة الرئيسية
+  private async handleIncomingMessage(payload: MessagePayload): Promise<void> {
+    console.log('📨 رسالة واردة من المنصة:', payload);
+    await messageHandlerService.handleIncomingMessage(payload);
   }
 
   /**

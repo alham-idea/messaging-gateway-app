@@ -2,6 +2,7 @@ import { ScrollView, View, Text, TouchableOpacity, FlatList } from "react-native
 import { ScreenContainer } from "@/components/screen-container";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
+import { useSubscriptions } from "@/hooks/use-subscriptions";
 
 interface BillingOption {
   id: string;
@@ -14,6 +15,7 @@ interface BillingOption {
 export default function BillingScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { currentSubscription, usageStats, loading } = useSubscriptions();
 
   const billingOptions: BillingOption[] = [
     {
@@ -85,6 +87,77 @@ export default function BillingScreen() {
             <Text className="text-base text-muted">
               إدارة الاشتراكات والدفع والفواتير
             </Text>
+          </View>
+
+          {/* Current Plan Summary */}
+          <View className="bg-surface rounded-lg p-4 border border-border">
+            <View className="flex-row justify-between items-start mb-4">
+              <View>
+                <Text className="text-sm text-muted mb-1">الباقة الحالية</Text>
+                <Text className="text-xl font-bold text-foreground">
+                  {usageStats?.plan?.name || "غير محدد"}
+                </Text>
+              </View>
+              {!!currentSubscription && (
+                <View className="items-end">
+                  <Text className="text-xs text-muted mb-1">تاريخ الانتهاء</Text>
+                  <Text className="text-sm font-semibold text-foreground">
+                    {new Date(currentSubscription.endDate).toLocaleDateString('ar-SA')}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Usage Stats */}
+            {usageStats && (
+              <View className="gap-4">
+                {/* Outbound Progress */}
+                <View>
+                  <View className="flex-row justify-between mb-2">
+                    <Text className="text-sm text-muted">إرسال (واتساب + SMS)</Text>
+                    <Text className="text-sm text-foreground font-semibold">
+                      {usageStats.usage.whatsappUsed + usageStats.usage.smsUsed} / {usageStats.usage.whatsappLimit > 1000000 ? '∞' : usageStats.usage.whatsappLimit}
+                    </Text>
+                  </View>
+                  <View className="h-2 rounded-full bg-border overflow-hidden">
+                    <View
+                      className="h-full bg-primary"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          ((usageStats.usage.whatsappUsed + usageStats.usage.smsUsed) /
+                            Math.max(1, usageStats.usage.whatsappLimit)) *
+                            100
+                        )}%`,
+                      }}
+                    />
+                  </View>
+                </View>
+
+                {/* Inbound Progress */}
+                <View>
+                  <View className="flex-row justify-between mb-2">
+                    <Text className="text-sm text-muted">استقبال (واتساب + SMS)</Text>
+                    <Text className="text-sm text-foreground font-semibold">
+                      {usageStats.usage.whatsappReceived + usageStats.usage.smsReceived} / {usageStats.usage.whatsappReceiveLimit > 1000000 ? '∞' : usageStats.usage.whatsappReceiveLimit}
+                    </Text>
+                  </View>
+                  <View className="h-2 rounded-full bg-border overflow-hidden">
+                    <View
+                      className="h-full bg-emerald-500"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          ((usageStats.usage.whatsappReceived + usageStats.usage.smsReceived) /
+                            Math.max(1, usageStats.usage.whatsappReceiveLimit)) *
+                            100
+                        )}%`,
+                      }}
+                    />
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
 
           {/* Billing Options */}

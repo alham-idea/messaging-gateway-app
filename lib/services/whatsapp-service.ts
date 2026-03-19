@@ -227,11 +227,7 @@ class WhatsAppService {
     while (this.messageQueue.length > 0) {
       const msg = this.messageQueue.shift();
       if (msg) {
-        // إضافة تأخير عشوائي بين 30-60 ثانية
-        const delay = Math.random() * 30000 + 30000;
-        setTimeout(() => {
-          this.sendMessage(msg.phoneNumber, msg.message, msg.messageId);
-        }, delay);
+        this.sendMessage(msg.phoneNumber, msg.message, msg.messageId);
       }
     }
   }
@@ -272,8 +268,21 @@ class WhatsAppService {
     // إخطار المستمعين
     this.messageListeners.forEach(listener => listener(message));
 
-    // إرسال الرسالة إلى المنصة
-    socketService.emit('whatsapp_message_received', message);
+    // إرسال الرسالة إلى المنصة (يجب أن يتم عبر MessageHandlerService لتوحيد المنطق والتخزين)
+    // socketService.emit('whatsapp_message_received', message); // Removed direct emit
+    
+    // استخدام messageHandlerService للتعامل مع الرسالة الواردة
+    // نحتاج لاستيراده، لكن لتجنب Circular Dependency، سنستخدم نمط Observer أو نستدعي socketService.emit بحدث موحد
+    // الخيار الأفضل: MessageHandlerService يجب أن يشترك في WhatsAppService
+    // لكن حالياً، WhatsAppService يستدعي socketService مباشرة.
+    // سنقوم بتغيير الحدث ليكون متوافقاً مع ما يتوقعه السيرفر، أو نترك MessageHandler يتعامل معه.
+    // في message-handler-service.ts قمنا بإضافة handleIncomingWhatsApp.
+    // سنقوم باستدعاء socketService.emit بحدث 'whatsapp_received' ونترك السيرفر يتعامل معه،
+    // ولكن للتخزين المحلي، يجب أن نمر عبر MessageHandler.
+    
+    // الحل المؤقت: بث حدث محلي عبر DeviceEventEmitter أو مشابه، أو الاستمرار في emit للسيرفر + تخزين محلي.
+    // بما أننا في "بوابة"، فالأهم هو إيصال الرسالة للسيرفر.
+    socketService.emit('whatsapp_received', message);
   }
 
   /**

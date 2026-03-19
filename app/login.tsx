@@ -135,7 +135,7 @@ export default function LoginScreen() {
                       ? 'border-error bg-error/10'
                       : 'border-border bg-surface'
                   )}
-                  placeholder="مثال: المستشفى السعودي الألماني"
+                  placeholder="مثال:شركة  ناصر   "
                   placeholderTextColor={colors.muted}
                   value={companyName}
                   onChangeText={setCompanyName}

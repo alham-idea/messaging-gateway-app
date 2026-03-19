@@ -189,6 +189,23 @@ export type AdminUser = typeof adminUsers.$inferSelect;
 export type InsertAdminUser = typeof adminUsers.$inferInsert;
 
 /**
+ * Connected devices table
+ */
+export const devices = mysqlTable("devices", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  phoneNumber: varchar("phoneNumber", { length: 20 }),
+  deviceType: varchar("deviceType", { length: 50 }),
+  status: mysqlEnum("status", ["online", "offline"]).default("offline").notNull(),
+  lastSeen: timestamp("lastSeen"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Device = typeof devices.$inferSelect;
+export type InsertDevice = typeof devices.$inferInsert;
+
+/**
  * Payment methods table for storing user payment methods
  */
 export const paymentMethods = mysqlTable("paymentMethods", {

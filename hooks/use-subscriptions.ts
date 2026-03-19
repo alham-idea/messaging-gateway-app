@@ -32,6 +32,12 @@ interface UsageStats {
   smsUsed: number;
   smsLimit: number;
   smsRemaining: number;
+  whatsappReceived: number;
+  whatsappReceiveLimit: number;
+  whatsappReceiveRemaining: number;
+  smsReceived: number;
+  smsReceiveLimit: number;
+  smsReceiveRemaining: number;
 }
 
 interface SubscriptionState {

@@ -70,6 +70,22 @@ async function startServer() {
     });
   });
 
+  // Admin login route
+  app.post("/api/admin/login", (req, res) => {
+    const { email, password } = req.body;
+    // In a real app, verify against DB and hash. For demo/admin:
+    if (email === "admin@example.com" && password === "password") {
+      const jwt = require("jsonwebtoken");
+      const token = jwt.sign({ role: "admin", email }, process.env.JWT_SECRET || "your-secret-key-change-in-production", { expiresIn: "1d" });
+      res.json({
+        token,
+        user: { id: 1, email, name: "Admin", role: "admin" }
+      });
+    } else {
+      res.status(401).json({ error: "Invalid credentials" });
+    }
+  });
+
   app.use(
     "/api/trpc",
     createExpressMiddleware({

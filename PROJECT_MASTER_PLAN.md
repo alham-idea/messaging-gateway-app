@@ -27,7 +27,7 @@
 ### Phase 1: Stability & Persistence (Est. 2 Weeks)
 *   [ ] **Fix**: Implement persistent Queue in Android App (SQLite).
 *   [ ] **Fix**: Improve WhatsApp DOM selectors (support English/Arabic + generic selectors).
-*   [ ] **Feature**: Add local quota enforcement in the App (sync with Backend).
+*   [x] **Feature**: Add local quota enforcement in the App (sync with Backend + SQLite counters).
 
 ### Phase 2: Client Experience (Est. 1 Week)
 *   [ ] **Docs**: Create "Client Server Setup Guide".

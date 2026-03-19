@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, AlertCircle, Calendar } from 'lucide-react';
+import { ArrowLeft, AlertCircle, Calendar, Edit3, Clock, RefreshCw } from 'lucide-react';
 import { adminApi } from '../services/adminApi';
 
 interface SubscriptionDetailsData {
@@ -16,6 +16,10 @@ const SubscriptionDetails: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newStatus, setNewStatus] = useState<string>('');
+  
+  // New State for actions
+  const [isExtending, setIsExtending] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   useEffect(() => {
     if (subscriptionId) {
@@ -49,6 +53,39 @@ const SubscriptionDetails: React.FC = () => {
       }
     } catch (err) {
       setError('فشل في تحديث حالة الاشتراك');
+    }
+  };
+
+  const handleExtendSubscription = async (days: number) => {
+    if (!subscriptionId) return;
+    try {
+      setIsExtending(true);
+      const res = await adminApi.extendSubscription(parseInt(subscriptionId), days);
+      if (details) {
+        setDetails({
+          ...details,
+          subscription: { ...details.subscription, endDate: res.newEndDate },
+        });
+      }
+      alert('تم تمديد الاشتراك بنجاح');
+    } catch (err) {
+      alert('فشل في تمديد الاشتراك');
+    } finally {
+      setIsExtending(false);
+    }
+  };
+
+  const handleResetQuota = async () => {
+    if (!details?.user?.id) return;
+    if (!confirm('هل أنت متأكد من تصفير الحصة اليومية لهذا المستخدم؟')) return;
+    try {
+      setIsResetting(true);
+      await adminApi.resetSubscriptionQuota(details.user.id);
+      alert('تم تصفير الحصة بنجاح');
+    } catch (err) {
+      alert('فشل في تصفير الحصة');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -165,7 +202,7 @@ const SubscriptionDetails: React.FC = () => {
           )}
 
           {/* Subscription Timeline */}
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">الجدول الزمني</h2>
             <div className="space-y-4">
               <div className="flex items-center">
@@ -193,6 +230,80 @@ const SubscriptionDetails: React.FC = () => {
                   <p className="text-gray-900 font-medium">
                     {new Date(subscription?.nextBillingDate).toLocaleDateString('ar-SA')}
                   </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Admin Actions */}
+          <div className="bg-white rounded-lg shadow p-6 border-t-4 border-blue-500">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Edit3 className="w-5 h-5 mr-2 text-blue-600" />
+              إجراءات إدارية
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="font-semibold mb-2 flex items-center">
+                  <Clock className="w-4 h-4 mr-2 text-gray-600" />
+                  تمديد الاشتراك
+                </h3>
+                <p className="text-xs text-gray-500 mb-3">إضافة أيام إضافية لصلاحية الاشتراك الحالي.</p>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => handleExtendSubscription(7)}
+                    disabled={isExtending}
+                    className="flex-1 bg-white border border-gray-300 px-2 py-1 rounded text-sm hover:bg-gray-100"
+                  >
+                    +7 أيام
+                  </button>
+                  <button 
+                    onClick={() => handleExtendSubscription(30)}
+                    disabled={isExtending}
+                    className="flex-1 bg-white border border-gray-300 px-2 py-1 rounded text-sm hover:bg-gray-100"
+                  >
+                    +30 يوم
+                  </button>
+                </div>
+              </div>
+              
+              <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                <h3 className="font-semibold mb-2 flex items-center text-red-800">
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  تصفير الحصة اليومية
+                </h3>
+                <p className="text-xs text-red-600 mb-3">إعادة تعيين عداد الرسائل لليوم الحالي (في حالات الطوارئ).</p>
+                <button 
+                  onClick={handleResetQuota}
+                  disabled={isResetting}
+                  className="w-full bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isResetting ? 'جاري التصفير...' : 'تصفير الحصة الآن'}
+                </button>
+              </div>
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 md:col-span-2">
+                <h3 className="font-semibold mb-2 flex items-center text-blue-800">
+                  <Edit3 className="w-4 h-4 mr-2" />
+                  تغيير الباقة
+                </h3>
+                <p className="text-xs text-blue-600 mb-3">تحديث باقة المشترك فورياً. (يجب تحديث التطبيق لرؤية التغييرات)</p>
+                <div className="flex gap-2">
+                  <select 
+                    className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
+                    onChange={(e) => {
+                      if (confirm('تأكيد تغيير الباقة؟')) {
+                        adminApi.updateSubscriptionPlan(parseInt(subscriptionId!), parseInt(e.target.value))
+                          .then(() => alert('تم التغيير بنجاح، قم بتحديث الصفحة'))
+                          .catch(() => alert('حدث خطأ'));
+                      }
+                    }}
+                    value={plan?.id || ''}
+                  >
+                    <option value="0">التجريبية</option>
+                    <option value="1">الباقة الأولى</option>
+                    <option value="2">الباقة الثانية</option>
+                    <option value="3">الباقة الثالثة</option>
+                    <option value="4">الباقة الذهبية</option>
+                  </select>
                 </div>
               </div>
             </div>

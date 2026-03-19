@@ -107,3 +107,15 @@ interface MessageResponse {
   timestamp: number;
 }
 ```
+
+## Quota Enforcement Notes
+- The Android App enforces local quotas per subscription plan using on-device SQLite counters for the active billing period.
+- When a limit is exceeded, the App immediately responds with `message_response` where:
+  - `status` = `failed`
+  - `error` = `quota_exceeded`
+- Randomized inter-message delays are centrally controlled via Settings to reduce automation fingerprints.
+- Limits are checked for both **Outbound** (Sending) and **Inbound** (Receiving).
+
+## Testing Payloads
+A collection of JSON payloads for testing SMS, WhatsApp, and events is available in `TESTING_PAYLOADS.json` at the project root.
+

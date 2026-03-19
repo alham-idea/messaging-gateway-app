@@ -54,3 +54,9 @@ The Messaging Gateway App is an Android application designed to act as a bridge 
 3.  The app connects to the client's server and listens for `send_message` events.
 4.  User logs into WhatsApp Web inside the app's WebView.
 5.  When a command is received, the app executes the sending logic via WebView (WhatsApp) or Native API (SMS).
+
+## Usage Controls
+-   **Quota Enforcement**: Local enforcement against plan limits (trial/basic/second/third/gold) using SQLite counters for the active billing period. Checks both inbound and outbound messages.
+-   **Random Delay**: Centralized, configurable random delay between messages via Settings (min/max seconds, enable/disable).
+-   **Channel Separation**: Strict separation between SMS and WhatsApp channels. No automatic fallback.
+-   **SMS Sync**: Syncs last 50 SMS messages on startup and listens for incoming SMS (requires `react-native-get-sms-android` and `react-native-android-sms-listener` in custom dev client).

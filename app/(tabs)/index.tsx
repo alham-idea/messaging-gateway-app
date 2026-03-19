@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, Text, View, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { ScrollView, Text, View, TouchableOpacity, FlatList, Alert, Platform, PermissionsAndroid } from 'react-native';
 import { ScreenContainer } from '@/components/screen-container';
 import { useRouter } from 'expo-router';
 import { socketService } from '@/lib/services/socket-service';
@@ -25,21 +25,55 @@ export default function HomeScreen() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [queueCount, setQueueCount] = useState(0);
   const [queueStats, setQueueStats] = useState({ pending: 0, sent: 0, failed: 0 });
+  const [permissions, setPermissions] = useState({ sms: false });
 
   useEffect(() => {
     checkConnection();
     updateStatus();
+    checkPermissions();
     
     // بدء خدمة الخلفية عند فتح التطبيق
     startService();
 
     // تحديث الحالة كل 5 ثوان
-    const interval = setInterval(updateStatus, 5000);
+    const interval = setInterval(() => {
+      updateStatus();
+      checkPermissions();
+    }, 5000);
 
     return () => {
       clearInterval(interval);
     };
   }, [startService]);
+
+  const checkPermissions = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.SEND_SMS);
+        setPermissions({ sms: granted });
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+  };
+
+  const requestPermissions = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        await PermissionsAndroid.requestMultiple([
+          PermissionsAndroid.PERMISSIONS.SEND_SMS,
+          PermissionsAndroid.PERMISSIONS.READ_SMS,
+          PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
+          PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE
+        ]);
+        checkPermissions();
+      } catch (err) {
+        console.warn(err);
+      }
+    } else {
+      Alert.alert('تنبيه', 'إدارة الصلاحيات متاحة فقط على نظام أندرويد');
+    }
+  };
 
   const checkConnection = async () => {
     const url = await AsyncStorage.getItem('socketUrl');
@@ -127,6 +161,30 @@ export default function HomeScreen() {
             <Text className="text-sm text-muted">
               آخر تحديث: {new Date().toLocaleTimeString('ar-SA')}
             </Text>
+          </View>
+
+          {/* Permissions Status Card */}
+          <View className="bg-surface rounded-lg p-4 border border-border">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-lg font-semibold text-foreground">
+                صلاحيات النظام
+              </Text>
+              <View
+                className={`px-2 py-1 rounded-full ${permissions.sms ? 'bg-success/20' : 'bg-error/20'}`}
+              >
+                <Text className={`text-xs font-bold ${permissions.sms ? 'text-success' : 'text-error'}`}>
+                  {permissions.sms ? 'SMS مفعل' : 'SMS غير مفعل'}
+                </Text>
+              </View>
+            </View>
+            {!permissions.sms && Platform.OS === 'android' && (
+              <View>
+                <Text className="text-xs text-error mb-2">يجب منح صلاحيات الرسائل ليعمل التطبيق بشكل صحيح.</Text>
+                <TouchableOpacity onPress={requestPermissions} className="bg-primary px-3 py-2 rounded items-center">
+                   <Text className="text-white text-sm font-semibold">طلب الصلاحيات</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
 
           {/* بطاقة معلومات الجهاز */}

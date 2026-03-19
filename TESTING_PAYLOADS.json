@@ -1,0 +1,68 @@
+{
+  "outbound": {
+    "sms": {
+      "id": "test_sms_001",
+      "type": "sms",
+      "phoneNumber": "+1234567890",
+      "message": "This is a test SMS from the Gateway.",
+      "timestamp": 1709251200000
+    },
+    "whatsapp": {
+      "id": "test_wa_001",
+      "type": "whatsapp",
+      "phoneNumber": "1234567890@c.us",
+      "message": "Hello from WhatsApp Gateway! 🚀",
+      "timestamp": 1709251200000
+    }
+  },
+  "inbound": {
+    "sms": {
+      "id": "incoming_sms_001",
+      "address": "+9876543210",
+      "body": "Reply: Yes, I received your message.",
+      "date": 1709251205000,
+      "read": false
+    },
+    "whatsapp": {
+      "id": "incoming_wa_001",
+      "sender": "9876543210@c.us",
+      "content": "Thanks for the update!",
+      "timestamp": 1709251210000,
+      "isGroup": false
+    }
+  },
+  "events": {
+    "sms_received": {
+      "id": "incoming_sms_001",
+      "type": "sms",
+      "phoneNumber": "+9876543210",
+      "message": "Reply: Yes, I received your message.",
+      "timestamp": 1709251205000
+    },
+    "whatsapp_received": {
+      "id": "incoming_wa_001",
+      "type": "whatsapp",
+      "phoneNumber": "9876543210@c.us",
+      "message": "Thanks for the update!",
+      "timestamp": 1709251210000
+    },
+    "sms_history_sync": {
+      "messages": [
+        {
+          "id": "hist_001",
+          "address": "+111222333",
+          "body": "Old message 1",
+          "date": 1709100000000,
+          "read": true
+        },
+        {
+          "id": "hist_002",
+          "address": "+444555666",
+          "body": "Old message 2",
+          "date": 1709100500000,
+          "read": true
+        }
+      ]
+    }
+  }
+}

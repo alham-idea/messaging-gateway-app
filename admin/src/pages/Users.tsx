@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Edit2, Trash2, Eye } from 'lucide-react';
-import { apiClient } from '../services/api';
+import { Edit2, Trash2, Eye, Smartphone, Wifi, WifiOff } from 'lucide-react';
+import { adminApi } from '../services/adminApi';
+
+interface Device {
+  id: number;
+  phoneNumber: string | null;
+  deviceType: string | null;
+  status: 'online' | 'offline';
+  lastSeen: string | null;
+}
 
 interface User {
   id: number;
@@ -8,12 +16,14 @@ interface User {
   name: string;
   createdAt: string;
   status: 'active' | 'inactive' | 'suspended';
+  devices?: Device[];
 }
 
 const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [total, setTotal] = useState(0);
 
   useEffect(() => {
     fetchUsers();
@@ -22,8 +32,9 @@ const Users: React.FC = () => {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/admin/users');
-      setUsers(response.data);
+      const response = await adminApi.getUsers(50, 0, searchTerm);
+      setUsers(response.items);
+      setTotal(response.total);
     } catch (error) {
       console.error('Error fetching users:', error);
     } finally {
@@ -31,10 +42,14 @@ const Users: React.FC = () => {
     }
   };
 
-  const filteredUsers = users.filter(user =>
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchUsers();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const filteredUsers = users; // already filtered by API
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
@@ -76,7 +91,7 @@ const Users: React.FC = () => {
             <tr>
               <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">البريد الإلكتروني</th>
               <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">الاسم</th>
-              <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">تاريخ الإنشاء</th>
+              <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">الأجهزة المتصلة</th>
               <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">الحالة</th>
               <th className="px-6 py-3 text-right text-sm font-semibold text-gray-900">الإجراءات</th>
             </tr>
@@ -86,7 +101,26 @@ const Users: React.FC = () => {
               <tr key={user.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 text-sm text-gray-900">{user.email}</td>
                 <td className="px-6 py-4 text-sm text-gray-900">{user.name}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{new Date(user.createdAt).toLocaleDateString('ar-SA')}</td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {user.devices && user.devices.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                      {user.devices.map(device => (
+                        <div key={device.id} className="flex items-center gap-2">
+                          <Smartphone className="w-4 h-4 text-gray-400" />
+                          <span className="text-xs">{device.deviceType || 'غير معروف'}</span>
+                          <span className="text-xs text-gray-400">({device.phoneNumber || 'لا يوجد رقم'})</span>
+                          {device.status === 'online' ? (
+                            <Wifi className="w-4 h-4 text-green-500" title="متصل" />
+                          ) : (
+                            <WifiOff className="w-4 h-4 text-red-500" title="غير متصل" />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">لا توجد أجهزة</span>
+                  )}
+                </td>
                 <td className="px-6 py-4">
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusBadge(user.status)}`}>
                     {user.status === 'active' ? 'نشط' : user.status === 'inactive' ? 'غير نشط' : 'معلق'}

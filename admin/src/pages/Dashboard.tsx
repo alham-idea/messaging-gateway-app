@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Users, CreditCard, TrendingUp, AlertCircle } from 'lucide-react';
-import { apiClient } from '../services/api';
+import { adminApi } from '../services/adminApi';
 
 interface DashboardStats {
   totalUsers: number;
@@ -29,8 +29,8 @@ const Dashboard: React.FC = () => {
     try {
       setLoading(true);
       // Fetch dashboard statistics
-      const response = await apiClient.get('/api/admin/dashboard');
-      setStats(response.data);
+      const data = await adminApi.getDashboardStats();
+      setStats(data);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {

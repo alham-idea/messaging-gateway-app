@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Download, Eye } from 'lucide-react';
-import { apiClient } from '../services/api';
+import { adminApi } from '../services/adminApi';
 
 interface Invoice {
   id: number;
@@ -12,6 +13,7 @@ interface Invoice {
 }
 
 const Invoices: React.FC = () => {
+  const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,8 +24,8 @@ const Invoices: React.FC = () => {
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/admin/invoices');
-      setInvoices(response.data);
+      const data = await adminApi.getInvoices(50, 0);
+      setInvoices(data.items || []);
     } catch (error) {
       console.error('Error fetching invoices:', error);
     } finally {
@@ -67,7 +69,7 @@ const Invoices: React.FC = () => {
                 <td className="px-6 py-4 text-sm text-gray-500">{new Date(invoice.createdAt).toLocaleDateString('ar-SA')}</td>
                 <td className="px-6 py-4">
                   <div className="flex gap-3">
-                    <button className="text-blue-600 hover:text-blue-900">
+                    <button onClick={() => navigate(`/invoices/${invoice.id}`)} className="text-blue-600 hover:text-blue-900">
                       <Eye className="w-5 h-5" />
                     </button>
                     <button className="text-green-600 hover:text-green-900">

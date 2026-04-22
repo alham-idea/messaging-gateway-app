@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Edit2, Trash2, Eye, Smartphone, Wifi, WifiOff } from 'lucide-react';
 import { adminApi } from '../services/adminApi';
 
@@ -20,6 +21,7 @@ interface User {
 }
 
 const Users: React.FC = () => {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -128,10 +130,10 @@ const Users: React.FC = () => {
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex gap-3">
-                    <button className="text-blue-600 hover:text-blue-900">
+                    <button onClick={() => navigate(`/users/${user.id}`)} className="text-blue-600 hover:text-blue-900">
                       <Eye className="w-5 h-5" />
                     </button>
-                    <button className="text-yellow-600 hover:text-yellow-900">
+                    <button onClick={() => navigate(`/users/${user.id}`)} className="text-yellow-600 hover:text-yellow-900">
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button className="text-red-600 hover:text-red-900">

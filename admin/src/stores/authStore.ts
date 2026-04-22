@@ -17,10 +17,14 @@ interface AuthStore {
   setToken: (token: string) => void;
 }
 
-export const useAuthStore = create<AuthStore>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  token: localStorage.getItem('adminToken'),
+export const useAuthStore = create<AuthStore>((set) => {
+  const savedToken = localStorage.getItem('adminToken');
+  const savedUser = localStorage.getItem('adminUser');
+  
+  return {
+    user: savedUser ? JSON.parse(savedUser) : null,
+    isAuthenticated: !!savedToken,
+    token: savedToken,
 
   login: async (email: string, password: string) => {
     try {
@@ -35,6 +39,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
 
       const data = await response.json();
       localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminUser', JSON.stringify(data.user));
       set({
         user: data.user,
         isAuthenticated: true,
@@ -46,21 +51,24 @@ export const useAuthStore = create<AuthStore>((set) => ({
     }
   },
 
-  logout: () => {
-    localStorage.removeItem('adminToken');
-    set({
-      user: null,
-      isAuthenticated: false,
-      token: null,
-    });
-  },
+    logout: () => {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('adminUser');
+      set({
+        user: null,
+        isAuthenticated: false,
+        token: null,
+      });
+    },
 
-  setUser: (user: User) => {
-    set({ user, isAuthenticated: true });
-  },
+    setUser: (user: User) => {
+      localStorage.setItem('adminUser', JSON.stringify(user));
+      set({ user, isAuthenticated: true });
+    },
 
-  setToken: (token: string) => {
-    localStorage.setItem('adminToken', token);
-    set({ token, isAuthenticated: true });
-  },
-}));
+    setToken: (token: string) => {
+      localStorage.setItem('adminToken', token);
+      set({ token, isAuthenticated: true });
+    },
+  };
+});

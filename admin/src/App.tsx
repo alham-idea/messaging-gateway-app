@@ -4,9 +4,12 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
 import Users from './pages/Users';
+import UserDetails from './pages/UserDetails';
 import Subscriptions from './pages/Subscriptions';
+import SubscriptionDetails from './pages/SubscriptionDetails';
 import Analytics from './pages/Analytics';
 import Invoices from './pages/Invoices';
+import InvoiceDetails from './pages/InvoiceDetails';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import { useAuthStore } from './stores/authStore';
@@ -15,7 +18,14 @@ function App() {
   const { isAuthenticated } = useAuthStore();
 
   if (!isAuthenticated) {
-    return <Login />;
+    return (
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Router>
+    );
   }
 
   return (
@@ -28,9 +38,12 @@ function App() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/users" element={<Users />} />
+              <Route path="/users/:userId" element={<UserDetails />} />
               <Route path="/subscriptions" element={<Subscriptions />} />
+              <Route path="/subscriptions/:subscriptionId" element={<SubscriptionDetails />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/invoices" element={<Invoices />} />
+              <Route path="/invoices/:invoiceId" element={<InvoiceDetails />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

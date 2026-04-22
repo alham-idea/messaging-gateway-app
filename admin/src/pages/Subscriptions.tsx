@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Edit2, Trash2 } from 'lucide-react';
-import { apiClient } from '../services/api';
+import { adminApi } from '../services/adminApi';
 
 interface Subscription {
   id: number;
@@ -13,6 +14,7 @@ interface Subscription {
 }
 
 const Subscriptions: React.FC = () => {
+  const navigate = useNavigate();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,8 +25,8 @@ const Subscriptions: React.FC = () => {
   const fetchSubscriptions = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/api/admin/subscriptions');
-      setSubscriptions(response.data);
+      const data = await adminApi.getSubscriptions(50, 0);
+      setSubscriptions(data.items || []);
     } catch (error) {
       console.error('Error fetching subscriptions:', error);
     } finally {
@@ -66,7 +68,7 @@ const Subscriptions: React.FC = () => {
                 <td className="px-6 py-4 text-sm text-gray-500">{new Date(sub.endDate).toLocaleDateString('ar-SA')}</td>
                 <td className="px-6 py-4">
                   <div className="flex gap-3">
-                    <button className="text-yellow-600 hover:text-yellow-900">
+                    <button onClick={() => navigate(`/subscriptions/${sub.id}`)} className="text-yellow-600 hover:text-yellow-900">
                       <Edit2 className="w-5 h-5" />
                     </button>
                     <button className="text-red-600 hover:text-red-900">

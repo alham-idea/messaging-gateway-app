@@ -134,6 +134,7 @@ class NotificationService {
       console.log('✓ تم إنشاء قنوات الإشعارات');
     } catch (error) {
       console.error('❌ خطأ في إنشاء قنوات الإشعارات:', error);
+      throw error;
     }
   }
 
@@ -159,6 +160,7 @@ class NotificationService {
       console.log(`✓ تم إنشاء قناة الإشعار: ${channel.id}`);
     } catch (error) {
       console.error(`❌ خطأ في إنشاء قناة الإشعار ${channel.id}:`, error);
+      throw error;
     }
   }
 

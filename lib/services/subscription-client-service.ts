@@ -264,7 +264,7 @@ class SubscriptionClientService {
       return response.data;
     } catch (error) {
       console.error("Failed to fetch subscription history:", error);
-      return [];
+      throw error;
     }
   }
 

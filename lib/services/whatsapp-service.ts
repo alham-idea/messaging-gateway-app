@@ -56,6 +56,7 @@ class WhatsAppService {
       }
     } catch (error) {
       console.error('خطأ في معالجة رسالة WebView:', error);
+      throw error;
     }
   }
 
@@ -64,8 +65,7 @@ class WhatsAppService {
    */
   private injectJavaScript(code: string): void {
     if (!this.webViewRef) {
-      console.warn('⚠️ مرجع WebView غير متوفر');
-      return;
+      throw new Error('مرجع WebView غير متوفر');
     }
 
     try {
@@ -73,6 +73,7 @@ class WhatsAppService {
       console.log('✓ تم حقن كود JavaScript');
     } catch (error) {
       console.error('خطأ في حقن JavaScript:', error);
+      throw error;
     }
   }
 

@@ -62,6 +62,7 @@ class BackupService {
       fs.writeFileSync(metadataFile, JSON.stringify(data, null, 2));
     } catch (error) {
       console.error('Error saving backup metadata:', error);
+      throw error;
     }
   }
 
@@ -279,7 +280,7 @@ class BackupService {
       return true;
     } catch (error) {
       console.error(`Backup integrity check failed: ${error}`);
-      return false;
+      throw error;
     }
   }
 

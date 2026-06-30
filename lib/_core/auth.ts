@@ -65,6 +65,7 @@ export async function removeSessionToken(): Promise<void> {
     console.log("[Auth] Session token removed from SecureStore successfully");
   } catch (error) {
     console.error("[Auth] Failed to remove session token:", error);
+    throw error;
   }
 }
 
@@ -110,6 +111,7 @@ export async function setUserInfo(user: User): Promise<void> {
     console.log("[Auth] User info stored in SecureStore successfully");
   } catch (error) {
     console.error("[Auth] Failed to set user info:", error);
+    throw error;
   }
 }
 
@@ -125,5 +127,6 @@ export async function clearUserInfo(): Promise<void> {
     await SecureStore.deleteItemAsync(USER_INFO_KEY);
   } catch (error) {
     console.error("[Auth] Failed to clear user info:", error);
+    throw error;
   }
 }

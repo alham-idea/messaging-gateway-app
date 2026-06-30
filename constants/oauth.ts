@@ -123,7 +123,7 @@ export async function startOAuthLogin(): Promise<string | null> {
     await Linking.openURL(loginUrl);
   } catch (error) {
     console.error("[OAuth] Failed to open login URL:", error);
-    // 可考虑抛出错误让调用方处理
+    throw error;
   }
 
   // The OAuth callback will reopen the app via deep link.

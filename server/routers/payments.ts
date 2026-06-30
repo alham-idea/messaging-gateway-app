@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 
@@ -35,8 +36,13 @@ export const paymentsRouter = router({
           status: "pending",
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Payment creation error:", error);
-        throw new Error("Failed to create payment");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create payment",
+          cause: error,
+        });
       }
     }),
 
@@ -60,8 +66,13 @@ export const paymentsRouter = router({
           total: payments?.length || 0,
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Payment history error:", error);
-        return { payments: [], total: 0 };
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch payment history",
+          cause: error,
+        });
       }
     }),
 
@@ -80,8 +91,13 @@ export const paymentsRouter = router({
         }
         return payment;
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Get payment error:", error);
-        throw new Error("Failed to retrieve payment");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to retrieve payment",
+          cause: error,
+        });
       }
     }),
 
@@ -110,8 +126,13 @@ export const paymentsRouter = router({
           payment: updated,
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Update payment status error:", error);
-        throw new Error("Failed to update payment status");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update payment status",
+          cause: error,
+        });
       }
     }),
 
@@ -151,8 +172,13 @@ export const paymentsRouter = router({
           invoiceNumber: invoiceNumber,
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Invoice creation error:", error);
-        throw new Error("Failed to create invoice");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create invoice",
+          cause: error,
+        });
       }
     }),
 
@@ -177,8 +203,13 @@ export const paymentsRouter = router({
           total: invoices?.length || 0,
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Get invoices error:", error);
-        return { invoices: [], total: 0 };
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to fetch invoices",
+          cause: error,
+        });
       }
     }),
 
@@ -197,8 +228,13 @@ export const paymentsRouter = router({
         }
         return invoice;
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Get invoice error:", error);
-        throw new Error("Failed to retrieve invoice");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to retrieve invoice",
+          cause: error,
+        });
       }
     }),
 
@@ -227,8 +263,13 @@ export const paymentsRouter = router({
           invoice: updated,
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Mark invoice as paid error:", error);
-        throw new Error("Failed to mark invoice as paid");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to mark invoice as paid",
+          cause: error,
+        });
       }
     }),
 
@@ -265,8 +306,13 @@ export const paymentsRouter = router({
           paymentMethodId: paymentMethod.id,
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Add payment method error:", error);
-        throw new Error("Failed to add payment method");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to add payment method",
+          cause: error,
+        });
       }
     }),
 
@@ -281,7 +327,11 @@ export const paymentsRouter = router({
       return methods || [];
     } catch (error) {
       console.error("Get payment methods error:", error);
-      return [];
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to fetch payment methods",
+        cause: error,
+      });
     }
   }),
 
@@ -302,8 +352,13 @@ export const paymentsRouter = router({
         await db.deletePaymentMethod(input.paymentMethodId);
         return { success: true };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Delete payment method error:", error);
-        throw new Error("Failed to delete payment method");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to delete payment method",
+          cause: error,
+        });
       }
     }),
 
@@ -340,8 +395,13 @@ export const paymentsRouter = router({
           status: "pending",
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Request refund error:", error);
-        throw new Error("Failed to request refund");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to request refund",
+          cause: error,
+        });
       }
     }),
 
@@ -360,8 +420,13 @@ export const paymentsRouter = router({
         }
         return refund;
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Get refund error:", error);
-        throw new Error("Failed to retrieve refund");
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to retrieve refund",
+          cause: error,
+        });
       }
     }),
 
@@ -423,8 +488,13 @@ export const paymentsRouter = router({
           finalAmount: input.amount - discountAmount,
         };
       } catch (error) {
+        if (error instanceof TRPCError) throw error;
         console.error("Apply coupon error:", error);
-        throw new Error(error instanceof Error ? error.message : "Failed to apply coupon");
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Failed to apply coupon",
+          cause: error,
+        });
       }
     }),
 });

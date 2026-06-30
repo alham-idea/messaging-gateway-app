@@ -34,57 +34,49 @@ class AuthClientService {
   }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
+    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(credentials),
+    });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'فشل تسجيل الدخول');
-      }
-
-      const data: AuthResponse = await response.json();
-      
-      // حفظ التوكن
-      await AsyncStorage.setItem('auth_token', data.token);
-      this.token = data.token;
-
-      return data;
-    } catch (error) {
-      throw error;
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'فشل تسجيل الدخول');
     }
+
+    const data: AuthResponse = await response.json();
+
+    // حفظ التوكن
+    await AsyncStorage.setItem('auth_token', data.token);
+    this.token = data.token;
+
+    return data;
   }
 
   async register(data: RegisterData): Promise<AuthResponse> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'فشل التسجيل');
-      }
-
-      const authData: AuthResponse = await response.json();
-      
-      // حفظ التوكن
-      await AsyncStorage.setItem('auth_token', authData.token);
-      this.token = authData.token;
-
-      return authData;
-    } catch (error) {
-      throw error;
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'فشل التسجيل');
     }
+
+    const authData: AuthResponse = await response.json();
+
+    // حفظ التوكن
+    await AsyncStorage.setItem('auth_token', authData.token);
+    this.token = authData.token;
+
+    return authData;
   }
 
   async logout(): Promise<void> {
@@ -93,6 +85,7 @@ class AuthClientService {
       this.token = null;
     } catch (error) {
       console.error('Logout error:', error);
+      throw error;
     }
   }
 

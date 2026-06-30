@@ -138,7 +138,7 @@ class EmailService {
       return processed;
     } catch (error) {
       console.error('Error processing email queue:', error);
-      return 0;
+      throw error;
     }
   }
 

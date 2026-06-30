@@ -67,6 +67,7 @@ class LogService {
       console.log(`✓ تم تحميل ${this.logs.length} سجل`);
     } catch (error) {
       console.error('❌ خطأ في تهيئة خدمة السجل:', error);
+      throw error;
     }
   }
 
@@ -322,6 +323,7 @@ class LogService {
       await AsyncStorage.setItem(this.storageKey, JSON.stringify(this.logs));
     } catch (error) {
       console.error('❌ خطأ في حفظ السجلات:', error);
+      throw error;
     }
   }
 
@@ -336,6 +338,7 @@ class LogService {
       }
     } catch (error) {
       console.error('❌ خطأ في تحميل السجلات:', error);
+      throw error;
     }
   }
 

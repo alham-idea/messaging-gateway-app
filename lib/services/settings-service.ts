@@ -88,6 +88,7 @@ class SettingsService {
       console.log('✓ تم تحميل الإعدادات');
     } catch (error) {
       console.error('❌ خطأ في تهيئة خدمة الإعدادات:', error);
+      throw error;
     }
   }
 
@@ -164,6 +165,7 @@ class SettingsService {
       await AsyncStorage.setItem(this.storageKey, JSON.stringify(this.settings));
     } catch (error) {
       console.error('❌ خطأ في حفظ الإعدادات:', error);
+      throw error;
     }
   }
 
@@ -178,6 +180,7 @@ class SettingsService {
       }
     } catch (error) {
       console.error('❌ خطأ في تحميل الإعدادات:', error);
+      throw error;
     }
   }
 

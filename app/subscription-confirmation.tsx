@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { ScreenHeader } from "@/components/screen-header";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -26,6 +26,7 @@ export default function SubscriptionConfirmationScreen() {
       router.replace("/manage-subscription");
     } catch (error) {
       console.error("Failed to confirm subscription:", error);
+      Alert.alert("خطأ", error instanceof Error ? error.message : "فشل تأكيد الاشتراك");
       setLoading(false);
     }
   };

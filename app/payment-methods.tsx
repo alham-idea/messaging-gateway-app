@@ -1,4 +1,4 @@
-import { ScrollView, View, Text, Pressable, ActivityIndicator } from "react-native";
+import { ScrollView, View, Text, Pressable, ActivityIndicator, Alert } from "react-native";
 import { useState, useEffect } from "react";
 import { useRouter } from "expo-router";
 import { ScreenContainer } from "@/components/screen-container";
@@ -29,6 +29,7 @@ export default function PaymentMethodsScreen() {
       setPaymentMethods(paymentMethods.filter((m) => m.id !== paymentMethodId));
     } catch (error) {
       console.error("Failed to delete payment method:", error);
+      Alert.alert("خطأ", "فشل حذف طريقة الدفع");
     }
   };
 

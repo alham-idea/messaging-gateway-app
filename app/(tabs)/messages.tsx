@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ScrollView, View, Text, TouchableOpacity, FlatList } from "react-native";
+import { ScrollView, View, Text, TouchableOpacity, FlatList, Alert } from "react-native";
 import { ScreenContainer } from "@/components/screen-container";
 import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/use-colors";
@@ -31,7 +31,8 @@ export default function MessagesScreen() {
       const msgs = await databaseService.getRecentMessages();
       setMessages(msgs);
     } catch (e) {
-      console.error(e);
+      console.error('Failed to load messages:', e);
+      Alert.alert('خطأ', 'فشل تحميل الرسائل');
     }
   };
 

@@ -89,7 +89,7 @@ export async function getAllDevices() {
   try {
     return await db.select().from(devices);
   } catch (error) {
-    // Return empty if table doesn't exist yet
+    console.warn("[Database] Error fetching devices (table may not exist yet):", error);
     return [];
   }
 }
@@ -100,6 +100,7 @@ export async function getUserDevices(userId: number) {
   try {
     return await db.select().from(devices).where(eq(devices.userId, userId));
   } catch (error) {
+    console.warn("[Database] Error fetching user devices (table may not exist yet):", error);
     return [];
   }
 }
@@ -650,7 +651,7 @@ export async function createInvoiceForSubscription(
     return invoiceNumber;
   } catch (error) {
     console.error("Error creating invoice:", error);
-    return null;
+    throw error;
   }
 }
 
@@ -679,7 +680,7 @@ export async function createMonthlyInvoices(): Promise<number> {
     return count;
   } catch (error) {
     console.error("Error creating monthly invoices:", error);
-    return 0;
+    throw error;
   }
 }
 
@@ -687,30 +688,20 @@ export async function createMonthlyInvoices(): Promise<number> {
  * جلب الفواتير المعلقة
  */
 export async function getPendingInvoices(): Promise<any[]> {
-  try {
-    const db = await getDb();
-    if (!db) throw new Error("Database not available");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
 
-    return await db.select().from(invoices).where(eq(invoices.invoiceStatus, "issued"));
-  } catch (error) {
-    console.error("Error getting pending invoices:", error);
-    return [];
-  }
+  return await db.select().from(invoices).where(eq(invoices.invoiceStatus, "issued"));
 }
 
 /**
  * جلب الفواتير المتأخرة
  */
 export async function getOverdueInvoices(): Promise<any[]> {
-  try {
-    const db = await getDb();
-    if (!db) throw new Error("Database not available");
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
 
-    return await db.select().from(invoices).where(eq(invoices.invoiceStatus, "overdue"));
-  } catch (error) {
-    console.error("Error getting overdue invoices:", error);
-    return [];
-  }
+  return await db.select().from(invoices).where(eq(invoices.invoiceStatus, "overdue"));
 }
 
 
@@ -785,7 +776,7 @@ export async function getNotifications(
       .offset(options.offset || 0);
   } catch (error) {
     console.error("Error getting notifications:", error);
-    return [];
+    throw error;
   }
 }
 
@@ -866,7 +857,7 @@ export async function getUnreadNotificationCount(userId: number): Promise<number
     return result.length;
   } catch (error) {
     console.error("Error getting unread notification count:", error);
-    return 0;
+    throw error;
   }
 }
 
@@ -883,7 +874,7 @@ export async function getNotificationPreferences(userId: number): Promise<any> {
     return prefs[0] || null;
   } catch (error) {
     console.error("Error getting notification preferences:", error);
-    return null;
+    throw error;
   }
 }
 
@@ -978,7 +969,7 @@ export async function getEmailQueue(options: {
       .limit(options.limit || 50);
   } catch (error) {
     console.error("Error getting email queue:", error);
-    return [];
+    throw error;
   }
 }
 

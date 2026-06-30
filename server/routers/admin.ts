@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 import { TRPCError } from "@trpc/server";
+import { requireAdmin, trpcHandler, findOrThrow, paginate } from "../_core/router-utils";
 
 /**
  * Admin Router - API endpoints for admin dashboard
@@ -13,24 +14,15 @@ export const adminRouter = router({
    * Get dashboard statistics
    */
   getDashboardStats: protectedProcedure.query(async ({ ctx }) => {
-    try {
-      // Check if user is admin
-      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Only admins can access dashboard",
-        });
-      }
+    return trpcHandler(async () => {
+      requireAdmin(ctx, "access dashboard");
 
-      // Get total users
       const users = await db.getAllUsers();
       const totalUsers = users?.length || 0;
 
-      // Get active subscriptions
       const subscriptions = await db.getAllActiveSubscriptions();
       const activeSubscriptions = subscriptions?.length || 0;
 
-      // Get monthly revenue
       const payments = await db.getAllPayments();
       const monthlyRevenue = payments?.reduce((sum: number, p: any) => {
         if (p.paymentStatus === "completed") {
@@ -39,10 +31,8 @@ export const adminRouter = router({
         return sum;
       }, 0) || 0;
 
-      // Get failed payments
       const failedPayments = payments?.filter((p: any) => p.paymentStatus === "failed").length || 0;
 
-      // Get chart data (mock for now)
       const chartData = generateChartData();
 
       return {
@@ -52,13 +42,7 @@ export const adminRouter = router({
         failedPayments,
         chartData,
       };
-    } catch (error) {
-      if (error instanceof TRPCError) throw error;
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to fetch dashboard statistics",
-      });
-    }
+    }, "Failed to fetch dashboard statistics");
   }),
 
   /**
@@ -74,18 +58,12 @@ export const adminRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can access user list",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "access user list");
 
         const users = await db.getAllUsers();
         let filtered = users || [];
 
-        // Apply search filter
         if (input.search) {
           filtered = filtered.filter(
             (u: any) =>
@@ -94,30 +72,17 @@ export const adminRouter = router({
           );
         }
 
-        // Apply pagination
-        const total = filtered.length;
-        const items = filtered.slice(input.offset, input.offset + input.limit);
+        const { items, total, limit, offset } = paginate(filtered, input);
 
         const allDevices = await db.getAllDevices();
-        
+
         const itemsWithDevices = items.map((u: any) => ({
           ...u,
           devices: allDevices.filter(d => d.userId === u.id)
         }));
 
-        return {
-          items: itemsWithDevices,
-          total,
-          limit: input.limit,
-          offset: input.offset,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch users",
-        });
-      }
+        return { items: itemsWithDevices, total, limit, offset };
+      }, "Failed to fetch users");
     }),
 
   /**
@@ -126,44 +91,20 @@ export const adminRouter = router({
   getUserDetails: protectedProcedure
     .input(z.object({ userId: z.number() }))
     .query(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can access user details",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "access user details");
 
-        const user = await db.getUserById(input.userId);
-        if (!user) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User not found",
-          });
-        }
+        const user = await findOrThrow(
+          () => db.getUserById(input.userId),
+          "User",
+        );
 
-        // Get user subscription
         const subscription = await db.getUserSubscription(input.userId);
-
-        // Get user payments
         const payments = await db.getUserPayments(input.userId, 100);
-
-        // Get user invoices
         const invoices = await db.getUserInvoices(input.userId);
 
-        return {
-          user,
-          subscription,
-          payments,
-          invoices,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch user details",
-        });
-      }
+        return { user, subscription, payments, invoices };
+      }, "Failed to fetch user details");
     }),
 
   /**
@@ -177,26 +118,15 @@ export const adminRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can update user status",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "update user status");
 
         await db.updateUser(input.userId, {
           role: input.isActive ? "user" : "user",
         });
 
         return { success: true };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to update user status",
-        });
-      }
+      }, "Failed to update user status");
     }),
 
   /**
@@ -211,39 +141,18 @@ export const adminRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can access subscriptions",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "access subscriptions");
 
         const subscriptions = await db.getAllActiveSubscriptions();
         let filtered = subscriptions || [];
 
-        // Apply status filter
         if (input.status) {
           filtered = filtered.filter((s: any) => s.status === input.status);
         }
 
-        // Apply pagination
-        const total = filtered.length;
-        const items = filtered.slice(input.offset, input.offset + input.limit);
-
-        return {
-          items,
-          total,
-          limit: input.limit,
-          offset: input.offset,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch subscriptions",
-        });
-      }
+        return paginate(filtered, input);
+      }, "Failed to fetch subscriptions");
     }),
 
   /**
@@ -252,40 +161,19 @@ export const adminRouter = router({
   getSubscriptionDetails: protectedProcedure
     .input(z.object({ subscriptionId: z.number() }))
     .query(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can access subscription details",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "access subscription details");
 
-        const subscription = await db.getSubscriptionById(input.subscriptionId);
-        if (!subscription) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Subscription not found",
-          });
-        }
+        const subscription = await findOrThrow(
+          () => db.getSubscriptionById(input.subscriptionId),
+          "Subscription",
+        );
 
-        // Get plan details
         const plan = await db.getSubscriptionPlan(subscription.planId);
-
-        // Get user details
         const user = await db.getUserById(subscription.userId);
 
-        return {
-          subscription,
-          plan,
-          user,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch subscription details",
-        });
-      }
+        return { subscription, plan, user };
+      }, "Failed to fetch subscription details");
     }),
 
   /**
@@ -299,87 +187,77 @@ export const adminRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
-      // Assuming db.updateSubscriptionStatus exists, if not we will use db.updateUserSubscription
+      requireAdmin(ctx);
       const dbInstance = await db.getDb();
       if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      
+
       const { userSubscriptions } = await import("../../drizzle/schema");
       const { eq } = await import("drizzle-orm");
-      
+
       await dbInstance.update(userSubscriptions)
         .set({ status: input.status })
         .where(eq(userSubscriptions.id, input.subscriptionId));
-        
+
       return { success: true };
     }),
 
   updateSubscriptionPlan: protectedProcedure
     .input(z.object({ subscriptionId: z.number(), planId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
+      requireAdmin(ctx);
       const dbInstance = await db.getDb();
       if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      
+
       const { userSubscriptions } = await import("../../drizzle/schema");
       const { eq } = await import("drizzle-orm");
-      
+
       await dbInstance.update(userSubscriptions)
         .set({ planId: input.planId })
         .where(eq(userSubscriptions.id, input.subscriptionId));
-        
+
       return { success: true };
     }),
 
   extendSubscription: protectedProcedure
     .input(z.object({ subscriptionId: z.number(), days: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
+      requireAdmin(ctx);
       const dbInstance = await db.getDb();
       if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      
+
       const { userSubscriptions } = await import("../../drizzle/schema");
       const { eq } = await import("drizzle-orm");
-      
+
       const sub = await dbInstance.select().from(userSubscriptions).where(eq(userSubscriptions.id, input.subscriptionId)).limit(1);
       if (!sub || sub.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
-      
+
       const currentEndDate = new Date(sub[0].endDate || new Date());
       currentEndDate.setDate(currentEndDate.getDate() + input.days);
-      
+
       await dbInstance.update(userSubscriptions)
         .set({ endDate: currentEndDate })
         .where(eq(userSubscriptions.id, input.subscriptionId));
-        
+
       return { success: true, newEndDate: currentEndDate };
     }),
 
   resetSubscriptionQuota: protectedProcedure
     .input(z.object({ userId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      }
+      requireAdmin(ctx);
       const dbInstance = await db.getDb();
       if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-      
+
       const { usageStatistics } = await import("../../drizzle/schema");
       const { eq, and, gte } = await import("drizzle-orm");
-      
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      // Reset today's stats for this user
+
       await dbInstance.update(usageStatistics)
-        .set({ 
-          whatsappMessagesSent: 0, 
-          smsMessagesSent: 0 
+        .set({
+          whatsappMessagesSent: 0,
+          smsMessagesSent: 0
         })
         .where(
           and(
@@ -387,7 +265,7 @@ export const adminRouter = router({
             gte(usageStatistics.date, today)
           )
         );
-        
+
       return { success: true };
     }),
 
@@ -403,39 +281,18 @@ export const adminRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can access invoices",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "access invoices");
 
         const invoices = await db.getAllInvoices();
         let filtered = invoices || [];
 
-        // Apply status filter
         if (input.status) {
           filtered = filtered.filter((i: any) => i.invoiceStatus === input.status);
         }
 
-        // Apply pagination
-        const total = filtered.length;
-        const items = filtered.slice(input.offset, input.offset + input.limit);
-
-        return {
-          items,
-          total,
-          limit: input.limit,
-          offset: input.offset,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch invoices",
-        });
-      }
+        return paginate(filtered, input);
+      }, "Failed to fetch invoices");
     }),
 
   /**
@@ -444,41 +301,20 @@ export const adminRouter = router({
   getInvoiceDetails: protectedProcedure
     .input(z.object({ invoiceId: z.number() }))
     .query(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can access invoice details",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "access invoice details");
 
-        const invoice = await db.getInvoiceById(input.invoiceId);
-        if (!invoice) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Invoice not found",
-          });
-        }
+        const invoice = await findOrThrow(
+          () => db.getInvoiceById(input.invoiceId),
+          "Invoice",
+        );
 
-        // Get user details
         const user = await db.getUserById(invoice.userId);
-
-        // Get related payments
         const payments = await db.getUserPayments(invoice.userId, 100);
         const relatedPayments = payments?.filter((p: any) => p.invoiceId === input.invoiceId) || [];
 
-        return {
-          invoice,
-          user,
-          relatedPayments,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch invoice details",
-        });
-      }
+        return { invoice, user, relatedPayments };
+      }, "Failed to fetch invoice details");
     }),
 
   /**
@@ -492,24 +328,13 @@ export const adminRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can update invoice status",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "update invoice status");
 
         await db.updateInvoiceStatus(input.invoiceId, input.status);
 
         return { success: true };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to update invoice status",
-        });
-      }
+      }, "Failed to update invoice status");
     }),
 
   /**
@@ -523,44 +348,20 @@ export const adminRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      try {
-        if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-          throw new TRPCError({
-            code: "UNAUTHORIZED",
-            message: "Only admins can access usage statistics",
-          });
-        }
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "access usage statistics");
 
         const stats = await db.getAllUsageStatistics();
-        const total = stats?.length || 0;
-        const items = stats?.slice(input.offset, input.offset + input.limit) || [];
-
-        return {
-          items,
-          total,
-          limit: input.limit,
-          offset: input.offset,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch usage statistics",
-        });
-      }
+        return paginate(stats || [], input);
+      }, "Failed to fetch usage statistics");
     }),
 
   /**
    * Get system health and statistics
    */
   getSystemHealth: protectedProcedure.query(async ({ ctx }) => {
-    try {
-      if (ctx.user?.role !== "admin" && (ctx.user?.role as any) !== "super_admin") {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Only admins can access system health",
-        });
-      }
+    return trpcHandler(async () => {
+      requireAdmin(ctx, "access system health");
 
       const users = await db.getAllUsers();
       const subscriptions = await db.getAllActiveSubscriptions();
@@ -577,13 +378,7 @@ export const adminRouter = router({
         paidInvoices: invoices?.filter((i: any) => i.invoiceStatus === "paid").length || 0,
         pendingInvoices: invoices?.filter((i: any) => i.invoiceStatus === "issued").length || 0,
       };
-    } catch (error) {
-      if (error instanceof TRPCError) throw error;
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to fetch system health",
-      });
-    }
+    }, "Failed to fetch system health");
   }),
 });
 

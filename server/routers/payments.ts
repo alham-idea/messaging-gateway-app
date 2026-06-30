@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
+import { TRPCError } from "@trpc/server";
+import { trpcHandler, verifyOwnership } from "../_core/router-utils";
 
 /**
  * Payments and Invoices Router
@@ -20,9 +21,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const payment = await db.createPayment({
           userId: ctx.user.id,
           amount: input.amount.toString(),
@@ -35,15 +34,7 @@ export const paymentsRouter = router({
           paymentId: payment.id,
           status: "pending",
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Payment creation error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create payment",
-          cause: error,
-        });
-      }
+      }, "Failed to create payment");
     }),
 
   /**
@@ -57,23 +48,13 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const payments = await db.getUserPayments(ctx.user.id, input.limit, input.offset);
         return {
           payments: payments || [],
           total: payments?.length || 0,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Payment history error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch payment history",
-          cause: error,
-        });
-      }
+      }, "Failed to fetch payment history");
     }),
 
   /**
@@ -82,23 +63,11 @@ export const paymentsRouter = router({
   getPayment: protectedProcedure
     .input(z.object({ paymentId: z.number() }))
     .query(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const payment = await db.getPaymentById(input.paymentId);
-        if (!payment || payment.userId !== ctx.user.id) {
-          throw new Error("Payment not found");
-        }
+        verifyOwnership(payment, ctx.user.id, "Payment");
         return payment;
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Get payment error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to retrieve payment",
-          cause: error,
-        });
-      }
+      }, "Failed to retrieve payment");
     }),
 
   /**
@@ -112,28 +81,16 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const payment = await db.getPaymentById(input.paymentId);
-        if (!payment || payment.userId !== ctx.user.id) {
-          throw new Error("Payment not found");
-        }
+        verifyOwnership(payment, ctx.user.id, "Payment");
 
         const updated = await db.updatePaymentStatus(input.paymentId, input.status);
         return {
           success: true,
           payment: updated,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Update payment status error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to update payment status",
-          cause: error,
-        });
-      }
+      }, "Failed to update payment status");
     }),
 
   /**
@@ -151,9 +108,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const invoice = await db.createInvoice({
           userId: ctx.user.id,
@@ -171,15 +126,7 @@ export const paymentsRouter = router({
           invoiceId: invoice.id,
           invoiceNumber: invoiceNumber,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Invoice creation error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to create invoice",
-          cause: error,
-        });
-      }
+      }, "Failed to create invoice");
     }),
 
   /**
@@ -194,23 +141,13 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const invoices = await db.getUserInvoices(ctx.user.id);
         return {
           invoices: invoices || [],
           total: invoices?.length || 0,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Get invoices error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to fetch invoices",
-          cause: error,
-        });
-      }
+      }, "Failed to fetch invoices");
     }),
 
   /**
@@ -219,23 +156,11 @@ export const paymentsRouter = router({
   getInvoice: protectedProcedure
     .input(z.object({ invoiceId: z.number() }))
     .query(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const invoice = await db.getInvoiceById(input.invoiceId);
-        if (!invoice || invoice.userId !== ctx.user.id) {
-          throw new Error("Invoice not found");
-        }
+        verifyOwnership(invoice, ctx.user.id, "Invoice");
         return invoice;
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Get invoice error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to retrieve invoice",
-          cause: error,
-        });
-      }
+      }, "Failed to retrieve invoice");
     }),
 
   /**
@@ -249,28 +174,16 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const invoice = await db.getInvoiceById(input.invoiceId);
-        if (!invoice || invoice.userId !== ctx.user.id) {
-          throw new Error("Invoice not found");
-        }
+        verifyOwnership(invoice, ctx.user.id, "Invoice");
 
         const updated = await db.updateInvoiceStatus(input.invoiceId, "paid");
         return {
           success: true,
           invoice: updated,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Mark invoice as paid error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to mark invoice as paid",
-          cause: error,
-        });
-      }
+      }, "Failed to mark invoice as paid");
     }),
 
   /**
@@ -288,9 +201,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const paymentMethod = await db.addPaymentMethod({
           userId: ctx.user.id,
           methodType: input.methodType,
@@ -305,34 +216,17 @@ export const paymentsRouter = router({
           success: true,
           paymentMethodId: paymentMethod.id,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Add payment method error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to add payment method",
-          cause: error,
-        });
-      }
+      }, "Failed to add payment method");
     }),
 
   /**
    * Get user's payment methods
    */
   getPaymentMethods: protectedProcedure.query(async ({ ctx }) => {
-    if (!ctx.user) throw new Error("Not authenticated");
-
-    try {
+    return trpcHandler(async () => {
       const methods = await db.getUserPaymentMethods(ctx.user.id);
       return methods || [];
-    } catch (error) {
-      console.error("Get payment methods error:", error);
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
-        message: "Failed to fetch payment methods",
-        cause: error,
-      });
-    }
+    }, "Failed to fetch payment methods");
   }),
 
   /**
@@ -341,25 +235,13 @@ export const paymentsRouter = router({
   deletePaymentMethod: protectedProcedure
     .input(z.object({ paymentMethodId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const method = await db.getPaymentMethodById(input.paymentMethodId);
-        if (!method || method.userId !== ctx.user.id) {
-          throw new Error("Payment method not found");
-        }
+        verifyOwnership(method, ctx.user.id, "Payment method");
 
         await db.deletePaymentMethod(input.paymentMethodId);
         return { success: true };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Delete payment method error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to delete payment method",
-          cause: error,
-        });
-      }
+      }, "Failed to delete payment method");
     }),
 
   /**
@@ -373,13 +255,9 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const payment = await db.getPaymentById(input.paymentId);
-        if (!payment || payment.userId !== ctx.user.id) {
-          throw new Error("Payment not found");
-        }
+        verifyOwnership(payment, ctx.user.id, "Payment");
 
         const refund = await db.createRefund({
           paymentId: input.paymentId,
@@ -394,15 +272,7 @@ export const paymentsRouter = router({
           refundId: refund.id,
           status: "pending",
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Request refund error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to request refund",
-          cause: error,
-        });
-      }
+      }, "Failed to request refund");
     }),
 
   /**
@@ -411,23 +281,11 @@ export const paymentsRouter = router({
   getRefund: protectedProcedure
     .input(z.object({ refundId: z.number() }))
     .query(async ({ input, ctx }) => {
-
-
-      try {
+      return trpcHandler(async () => {
         const refund = await db.getRefundById(input.refundId);
-        if (!refund || refund.userId !== ctx.user.id) {
-          throw new Error("Refund not found");
-        }
+        verifyOwnership(refund, ctx.user.id, "Refund");
         return refund;
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Get refund error:", error);
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to retrieve refund",
-          cause: error,
-        });
-      }
+      }, "Failed to retrieve refund");
     }),
 
   /**
@@ -441,60 +299,44 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-
-
-      try {
-        const coupon = await db.getCouponByCode(input.couponCode);
-        if (!coupon || !coupon.isActive) {
-          throw new Error("Coupon not found or inactive");
-        }
-
-        // Check coupon validity
-        const now = new Date();
-        if (coupon.validFrom && new Date(coupon.validFrom) > now) {
-          throw new Error("Coupon is not yet valid");
-        }
-        if (coupon.validUntil && new Date(coupon.validUntil) < now) {
-          throw new Error("Coupon has expired");
-        }
-
-        // Check usage limits
-        if (coupon.maxUses && coupon.currentUses >= coupon.maxUses) {
-          throw new Error("Coupon usage limit reached");
-        }
-
-        // Check amount limits
-        if (coupon.minAmount && input.amount < parseFloat(coupon.minAmount.toString())) {
-          throw new Error(`Minimum amount required: ${coupon.minAmount}`);
-        }
-        if (coupon.maxAmount && input.amount > parseFloat(coupon.maxAmount.toString())) {
-          throw new Error(`Maximum amount allowed: ${coupon.maxAmount}`);
-        }
-
-        // Calculate discount
-        let discountAmount = 0;
-        if (coupon.discountType === "percentage") {
-          discountAmount = (input.amount * parseFloat(coupon.discountValue.toString())) / 100;
-        } else {
-          discountAmount = parseFloat(coupon.discountValue.toString());
-        }
-
-        return {
-          success: true,
-          couponCode: coupon.code,
-          discountType: coupon.discountType,
-          discountValue: coupon.discountValue,
-          discountAmount,
-          finalAmount: input.amount - discountAmount,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        console.error("Apply coupon error:", error);
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: error instanceof Error ? error.message : "Failed to apply coupon",
-          cause: error,
-        });
+      const coupon = await db.getCouponByCode(input.couponCode);
+      if (!coupon || !coupon.isActive) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Coupon not found or inactive" });
       }
+
+      const now = new Date();
+      if (coupon.validFrom && new Date(coupon.validFrom) > now) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Coupon is not yet valid" });
+      }
+      if (coupon.validUntil && new Date(coupon.validUntil) < now) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Coupon has expired" });
+      }
+
+      if (coupon.maxUses && coupon.currentUses >= coupon.maxUses) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Coupon usage limit reached" });
+      }
+
+      if (coupon.minAmount && input.amount < parseFloat(coupon.minAmount.toString())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Minimum amount required: ${coupon.minAmount}` });
+      }
+      if (coupon.maxAmount && input.amount > parseFloat(coupon.maxAmount.toString())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Maximum amount allowed: ${coupon.maxAmount}` });
+      }
+
+      let discountAmount = 0;
+      if (coupon.discountType === "percentage") {
+        discountAmount = (input.amount * parseFloat(coupon.discountValue.toString())) / 100;
+      } else {
+        discountAmount = parseFloat(coupon.discountValue.toString());
+      }
+
+      return {
+        success: true,
+        couponCode: coupon.code,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        discountAmount,
+        finalAmount: input.amount - discountAmount,
+      };
     }),
 });

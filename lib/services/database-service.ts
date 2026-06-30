@@ -76,6 +76,7 @@ class DatabaseService {
       }
     } catch (error) {
       console.error('Error migrating tables:', error);
+      throw error;
     }
   }
 

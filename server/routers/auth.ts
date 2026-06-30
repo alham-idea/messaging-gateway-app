@@ -5,12 +5,18 @@ import { TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import { trpcHandler, findOrThrow } from "../_core/router-utils";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET environment variable is required");
+  }
+  return secret;
+}
 
 function generateToken(user: { id: number; email: string }): string {
   return jwt.sign(
     { userId: user.id, email: user.email },
-    JWT_SECRET,
+    getJwtSecret(),
     { expiresIn: "7d" }
   );
 }

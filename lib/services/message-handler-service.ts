@@ -37,6 +37,7 @@ class MessageHandlerService {
       this.processQueue();
     } catch (error) {
       console.error('Failed to initialize MessageHandlerService:', error);
+      throw error;
     }
   }
 

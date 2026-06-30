@@ -30,20 +30,20 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // Enable CORS for all routes - reflect the request origin to support credentials
+  // CORS middleware — only allow configured origins
+  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "").split(",").map(o => o.trim()).filter(Boolean);
   app.use((req, res, next) => {
     const origin = req.headers.origin;
-    if (origin) {
+    if (origin && allowedOrigins.includes(origin)) {
       res.header("Access-Control-Allow-Origin", origin);
+      res.header("Access-Control-Allow-Credentials", "true");
     }
     res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     res.header(
       "Access-Control-Allow-Headers",
       "Origin, X-Requested-With, Content-Type, Accept, Authorization",
     );
-    res.header("Access-Control-Allow-Credentials", "true");
 
-    // Handle preflight requests
     if (req.method === "OPTIONS") {
       res.sendStatus(200);
       return;
@@ -51,8 +51,8 @@ async function startServer() {
     next();
   });
 
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use(express.json({ limit: "1mb" }));
+  app.use(express.urlencoded({ limit: "1mb", extended: true }));
 
   // Serve admin dashboard
   app.use("/admin", express.static("public/admin"));
@@ -66,23 +66,49 @@ async function startServer() {
     res.json({ 
       ok: true, 
       timestamp: Date.now(),
-      admin: "http://localhost:" + port + "/admin"
     });
   });
 
   // Admin login route
-  app.post("/api/admin/login", (req, res) => {
+  app.post("/api/admin/login", async (req, res) => {
     const { email, password } = req.body;
-    // In a real app, verify against DB and hash. For demo/admin:
-    if (email === "admin@example.com" && password === "password") {
-      const jwt = require("jsonwebtoken");
-      const token = jwt.sign({ role: "admin", email }, process.env.JWT_SECRET || "your-secret-key-change-in-production", { expiresIn: "1d" });
+
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const JWT_SECRET = process.env.JWT_SECRET;
+    if (!JWT_SECRET) {
+      console.error("JWT_SECRET environment variable is not set");
+      return res.status(500).json({ error: "Server configuration error" });
+    }
+
+    try {
+      const { getAdminUserByEmail, verifyPassword } = await import("../db");
+      const adminUser = await getAdminUserByEmail(email);
+
+      if (!adminUser || !adminUser.passwordHash) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const isValid = await verifyPassword(password, adminUser.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const jwt = await import("jsonwebtoken");
+      const token = jwt.default.sign(
+        { role: adminUser.role, email: adminUser.email, adminId: adminUser.id },
+        JWT_SECRET,
+        { expiresIn: "1d" }
+      );
       res.json({
         token,
-        user: { id: 1, email, name: "Admin", role: "admin" }
+        user: { id: adminUser.id, email: adminUser.email, name: adminUser.username, role: adminUser.role }
       });
-    } else {
-      res.status(401).json({ error: "Invalid credentials" });
+    } catch (error) {
+      console.error("Admin login error:", error);
+      res.status(500).json({ error: "Login failed" });
     }
   });
 

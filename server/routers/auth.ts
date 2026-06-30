@@ -4,7 +4,13 @@ import * as db from "../db";
 import { TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("JWT_SECRET environment variable is required");
+  }
+  return secret;
+}
 
 export const authRouter = router({
   /**
@@ -55,7 +61,7 @@ export const authRouter = router({
 
         const token = jwt.sign(
           { userId: user.id, email: user.email },
-          JWT_SECRET,
+          getJwtSecret(),
           { expiresIn: "7d" }
         );
 
@@ -130,7 +136,7 @@ export const authRouter = router({
         // Generate JWT token
         const token = jwt.sign(
           { userId: user.id, email: user.email },
-          JWT_SECRET,
+          getJwtSecret(),
           { expiresIn: "7d" }
         );
 

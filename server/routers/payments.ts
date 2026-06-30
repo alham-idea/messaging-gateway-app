@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 
 /**
@@ -10,7 +10,7 @@ export const paymentsRouter = router({
   /**
    * Create a payment for subscription
    */
-  createPayment: publicProcedure
+  createPayment: protectedProcedure
     .input(
       z.object({
         amount: z.number().positive(),
@@ -19,7 +19,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const payment = await db.createPayment({
@@ -43,7 +43,7 @@ export const paymentsRouter = router({
   /**
    * Get user's payment history
    */
-  getPaymentHistory: publicProcedure
+  getPaymentHistory: protectedProcedure
     .input(
       z.object({
         limit: z.number().default(10),
@@ -51,7 +51,7 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const payments = await db.getUserPayments(ctx.user.id, input.limit, input.offset);
@@ -68,10 +68,10 @@ export const paymentsRouter = router({
   /**
    * Get payment details
    */
-  getPayment: publicProcedure
+  getPayment: protectedProcedure
     .input(z.object({ paymentId: z.number() }))
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const payment = await db.getPaymentById(input.paymentId);
@@ -88,7 +88,7 @@ export const paymentsRouter = router({
   /**
    * Update payment status
    */
-  updatePaymentStatus: publicProcedure
+  updatePaymentStatus: protectedProcedure
     .input(
       z.object({
         paymentId: z.number(),
@@ -96,7 +96,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const payment = await db.getPaymentById(input.paymentId);
@@ -118,7 +118,7 @@ export const paymentsRouter = router({
   /**
    * Create invoice for subscription
    */
-  createInvoice: publicProcedure
+  createInvoice: protectedProcedure
     .input(
       z.object({
         subscriptionId: z.number(),
@@ -130,7 +130,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -159,7 +159,7 @@ export const paymentsRouter = router({
   /**
    * Get user's invoices
    */
-  getInvoices: publicProcedure
+  getInvoices: protectedProcedure
     .input(
       z.object({
         limit: z.number().default(10),
@@ -168,7 +168,7 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const invoices = await db.getUserInvoices(ctx.user.id);
@@ -185,10 +185,10 @@ export const paymentsRouter = router({
   /**
    * Get invoice details
    */
-  getInvoice: publicProcedure
+  getInvoice: protectedProcedure
     .input(z.object({ invoiceId: z.number() }))
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const invoice = await db.getInvoiceById(input.invoiceId);
@@ -205,7 +205,7 @@ export const paymentsRouter = router({
   /**
    * Mark invoice as paid
    */
-  markInvoiceAsPaid: publicProcedure
+  markInvoiceAsPaid: protectedProcedure
     .input(
       z.object({
         invoiceId: z.number(),
@@ -213,7 +213,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const invoice = await db.getInvoiceById(input.invoiceId);
@@ -235,7 +235,7 @@ export const paymentsRouter = router({
   /**
    * Add payment method
    */
-  addPaymentMethod: publicProcedure
+  addPaymentMethod: protectedProcedure
     .input(
       z.object({
         methodType: z.enum(["credit_card", "debit_card", "bank_account", "wallet"]),
@@ -247,7 +247,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const paymentMethod = await db.addPaymentMethod({
@@ -273,7 +273,7 @@ export const paymentsRouter = router({
   /**
    * Get user's payment methods
    */
-  getPaymentMethods: publicProcedure.query(async ({ ctx }) => {
+  getPaymentMethods: protectedProcedure.query(async ({ ctx }) => {
     if (!ctx.user) throw new Error("Not authenticated");
 
     try {
@@ -288,10 +288,10 @@ export const paymentsRouter = router({
   /**
    * Delete payment method
    */
-  deletePaymentMethod: publicProcedure
+  deletePaymentMethod: protectedProcedure
     .input(z.object({ paymentMethodId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const method = await db.getPaymentMethodById(input.paymentMethodId);
@@ -310,7 +310,7 @@ export const paymentsRouter = router({
   /**
    * Request refund
    */
-  requestRefund: publicProcedure
+  requestRefund: protectedProcedure
     .input(
       z.object({
         paymentId: z.number(),
@@ -318,7 +318,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const payment = await db.getPaymentById(input.paymentId);
@@ -348,10 +348,10 @@ export const paymentsRouter = router({
   /**
    * Get refund status
    */
-  getRefund: publicProcedure
+  getRefund: protectedProcedure
     .input(z.object({ refundId: z.number() }))
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const refund = await db.getRefundById(input.refundId);
@@ -368,7 +368,7 @@ export const paymentsRouter = router({
   /**
    * Apply coupon code
    */
-  applyCoupon: publicProcedure
+  applyCoupon: protectedProcedure
     .input(
       z.object({
         couponCode: z.string(),
@@ -376,7 +376,7 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
+
 
       try {
         const coupon = await db.getCouponByCode(input.couponCode);

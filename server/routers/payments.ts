@@ -1,6 +1,8 @@
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc";
+import { protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
+import { TRPCError } from "@trpc/server";
+import { trpcHandler, verifyOwnership } from "../_core/router-utils";
 
 /**
  * Payments and Invoices Router
@@ -10,7 +12,7 @@ export const paymentsRouter = router({
   /**
    * Create a payment for subscription
    */
-  createPayment: publicProcedure
+  createPayment: protectedProcedure
     .input(
       z.object({
         amount: z.number().positive(),
@@ -19,9 +21,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const payment = await db.createPayment({
           userId: ctx.user.id,
           amount: input.amount.toString(),
@@ -34,16 +34,13 @@ export const paymentsRouter = router({
           paymentId: payment.id,
           status: "pending",
         };
-      } catch (error) {
-        console.error("Payment creation error:", error);
-        throw new Error("Failed to create payment");
-      }
+      }, "Failed to create payment");
     }),
 
   /**
    * Get user's payment history
    */
-  getPaymentHistory: publicProcedure
+  getPaymentHistory: protectedProcedure
     .input(
       z.object({
         limit: z.number().default(10),
@@ -51,44 +48,32 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const payments = await db.getUserPayments(ctx.user.id, input.limit, input.offset);
         return {
           payments: payments || [],
           total: payments?.length || 0,
         };
-      } catch (error) {
-        console.error("Payment history error:", error);
-        return { payments: [], total: 0 };
-      }
+      }, "Failed to fetch payment history");
     }),
 
   /**
    * Get payment details
    */
-  getPayment: publicProcedure
+  getPayment: protectedProcedure
     .input(z.object({ paymentId: z.number() }))
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const payment = await db.getPaymentById(input.paymentId);
-        if (!payment || payment.userId !== ctx.user.id) {
-          throw new Error("Payment not found");
-        }
+        verifyOwnership(payment, ctx.user.id, "Payment");
         return payment;
-      } catch (error) {
-        console.error("Get payment error:", error);
-        throw new Error("Failed to retrieve payment");
-      }
+      }, "Failed to retrieve payment");
     }),
 
   /**
    * Update payment status
    */
-  updatePaymentStatus: publicProcedure
+  updatePaymentStatus: protectedProcedure
     .input(
       z.object({
         paymentId: z.number(),
@@ -96,29 +81,22 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const payment = await db.getPaymentById(input.paymentId);
-        if (!payment || payment.userId !== ctx.user.id) {
-          throw new Error("Payment not found");
-        }
+        verifyOwnership(payment, ctx.user.id, "Payment");
 
         const updated = await db.updatePaymentStatus(input.paymentId, input.status);
         return {
           success: true,
           payment: updated,
         };
-      } catch (error) {
-        console.error("Update payment status error:", error);
-        throw new Error("Failed to update payment status");
-      }
+      }, "Failed to update payment status");
     }),
 
   /**
    * Create invoice for subscription
    */
-  createInvoice: publicProcedure
+  createInvoice: protectedProcedure
     .input(
       z.object({
         subscriptionId: z.number(),
@@ -130,9 +108,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const invoiceNumber = `INV-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         const invoice = await db.createInvoice({
           userId: ctx.user.id,
@@ -150,16 +126,13 @@ export const paymentsRouter = router({
           invoiceId: invoice.id,
           invoiceNumber: invoiceNumber,
         };
-      } catch (error) {
-        console.error("Invoice creation error:", error);
-        throw new Error("Failed to create invoice");
-      }
+      }, "Failed to create invoice");
     }),
 
   /**
    * Get user's invoices
    */
-  getInvoices: publicProcedure
+  getInvoices: protectedProcedure
     .input(
       z.object({
         limit: z.number().default(10),
@@ -168,44 +141,32 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const invoices = await db.getUserInvoices(ctx.user.id);
         return {
           invoices: invoices || [],
           total: invoices?.length || 0,
         };
-      } catch (error) {
-        console.error("Get invoices error:", error);
-        return { invoices: [], total: 0 };
-      }
+      }, "Failed to fetch invoices");
     }),
 
   /**
    * Get invoice details
    */
-  getInvoice: publicProcedure
+  getInvoice: protectedProcedure
     .input(z.object({ invoiceId: z.number() }))
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const invoice = await db.getInvoiceById(input.invoiceId);
-        if (!invoice || invoice.userId !== ctx.user.id) {
-          throw new Error("Invoice not found");
-        }
+        verifyOwnership(invoice, ctx.user.id, "Invoice");
         return invoice;
-      } catch (error) {
-        console.error("Get invoice error:", error);
-        throw new Error("Failed to retrieve invoice");
-      }
+      }, "Failed to retrieve invoice");
     }),
 
   /**
    * Mark invoice as paid
    */
-  markInvoiceAsPaid: publicProcedure
+  markInvoiceAsPaid: protectedProcedure
     .input(
       z.object({
         invoiceId: z.number(),
@@ -213,29 +174,22 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const invoice = await db.getInvoiceById(input.invoiceId);
-        if (!invoice || invoice.userId !== ctx.user.id) {
-          throw new Error("Invoice not found");
-        }
+        verifyOwnership(invoice, ctx.user.id, "Invoice");
 
         const updated = await db.updateInvoiceStatus(input.invoiceId, "paid");
         return {
           success: true,
           invoice: updated,
         };
-      } catch (error) {
-        console.error("Mark invoice as paid error:", error);
-        throw new Error("Failed to mark invoice as paid");
-      }
+      }, "Failed to mark invoice as paid");
     }),
 
   /**
    * Add payment method
    */
-  addPaymentMethod: publicProcedure
+  addPaymentMethod: protectedProcedure
     .input(
       z.object({
         methodType: z.enum(["credit_card", "debit_card", "bank_account", "wallet"]),
@@ -247,9 +201,7 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const paymentMethod = await db.addPaymentMethod({
           userId: ctx.user.id,
           methodType: input.methodType,
@@ -264,53 +216,38 @@ export const paymentsRouter = router({
           success: true,
           paymentMethodId: paymentMethod.id,
         };
-      } catch (error) {
-        console.error("Add payment method error:", error);
-        throw new Error("Failed to add payment method");
-      }
+      }, "Failed to add payment method");
     }),
 
   /**
    * Get user's payment methods
    */
-  getPaymentMethods: publicProcedure.query(async ({ ctx }) => {
-    if (!ctx.user) throw new Error("Not authenticated");
-
-    try {
+  getPaymentMethods: protectedProcedure.query(async ({ ctx }) => {
+    return trpcHandler(async () => {
       const methods = await db.getUserPaymentMethods(ctx.user.id);
       return methods || [];
-    } catch (error) {
-      console.error("Get payment methods error:", error);
-      return [];
-    }
+    }, "Failed to fetch payment methods");
   }),
 
   /**
    * Delete payment method
    */
-  deletePaymentMethod: publicProcedure
+  deletePaymentMethod: protectedProcedure
     .input(z.object({ paymentMethodId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const method = await db.getPaymentMethodById(input.paymentMethodId);
-        if (!method || method.userId !== ctx.user.id) {
-          throw new Error("Payment method not found");
-        }
+        verifyOwnership(method, ctx.user.id, "Payment method");
 
         await db.deletePaymentMethod(input.paymentMethodId);
         return { success: true };
-      } catch (error) {
-        console.error("Delete payment method error:", error);
-        throw new Error("Failed to delete payment method");
-      }
+      }, "Failed to delete payment method");
     }),
 
   /**
    * Request refund
    */
-  requestRefund: publicProcedure
+  requestRefund: protectedProcedure
     .input(
       z.object({
         paymentId: z.number(),
@@ -318,13 +255,9 @@ export const paymentsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const payment = await db.getPaymentById(input.paymentId);
-        if (!payment || payment.userId !== ctx.user.id) {
-          throw new Error("Payment not found");
-        }
+        verifyOwnership(payment, ctx.user.id, "Payment");
 
         const refund = await db.createRefund({
           paymentId: input.paymentId,
@@ -339,36 +272,26 @@ export const paymentsRouter = router({
           refundId: refund.id,
           status: "pending",
         };
-      } catch (error) {
-        console.error("Request refund error:", error);
-        throw new Error("Failed to request refund");
-      }
+      }, "Failed to request refund");
     }),
 
   /**
    * Get refund status
    */
-  getRefund: publicProcedure
+  getRefund: protectedProcedure
     .input(z.object({ refundId: z.number() }))
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
+      return trpcHandler(async () => {
         const refund = await db.getRefundById(input.refundId);
-        if (!refund || refund.userId !== ctx.user.id) {
-          throw new Error("Refund not found");
-        }
+        verifyOwnership(refund, ctx.user.id, "Refund");
         return refund;
-      } catch (error) {
-        console.error("Get refund error:", error);
-        throw new Error("Failed to retrieve refund");
-      }
+      }, "Failed to retrieve refund");
     }),
 
   /**
    * Apply coupon code
    */
-  applyCoupon: publicProcedure
+  applyCoupon: protectedProcedure
     .input(
       z.object({
         couponCode: z.string(),
@@ -376,55 +299,44 @@ export const paymentsRouter = router({
       })
     )
     .query(async ({ input, ctx }) => {
-      if (!ctx.user) throw new Error("Not authenticated");
-
-      try {
-        const coupon = await db.getCouponByCode(input.couponCode);
-        if (!coupon || !coupon.isActive) {
-          throw new Error("Coupon not found or inactive");
-        }
-
-        // Check coupon validity
-        const now = new Date();
-        if (coupon.validFrom && new Date(coupon.validFrom) > now) {
-          throw new Error("Coupon is not yet valid");
-        }
-        if (coupon.validUntil && new Date(coupon.validUntil) < now) {
-          throw new Error("Coupon has expired");
-        }
-
-        // Check usage limits
-        if (coupon.maxUses && coupon.currentUses >= coupon.maxUses) {
-          throw new Error("Coupon usage limit reached");
-        }
-
-        // Check amount limits
-        if (coupon.minAmount && input.amount < parseFloat(coupon.minAmount.toString())) {
-          throw new Error(`Minimum amount required: ${coupon.minAmount}`);
-        }
-        if (coupon.maxAmount && input.amount > parseFloat(coupon.maxAmount.toString())) {
-          throw new Error(`Maximum amount allowed: ${coupon.maxAmount}`);
-        }
-
-        // Calculate discount
-        let discountAmount = 0;
-        if (coupon.discountType === "percentage") {
-          discountAmount = (input.amount * parseFloat(coupon.discountValue.toString())) / 100;
-        } else {
-          discountAmount = parseFloat(coupon.discountValue.toString());
-        }
-
-        return {
-          success: true,
-          couponCode: coupon.code,
-          discountType: coupon.discountType,
-          discountValue: coupon.discountValue,
-          discountAmount,
-          finalAmount: input.amount - discountAmount,
-        };
-      } catch (error) {
-        console.error("Apply coupon error:", error);
-        throw new Error(error instanceof Error ? error.message : "Failed to apply coupon");
+      const coupon = await db.getCouponByCode(input.couponCode);
+      if (!coupon || !coupon.isActive) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Coupon not found or inactive" });
       }
+
+      const now = new Date();
+      if (coupon.validFrom && new Date(coupon.validFrom) > now) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Coupon is not yet valid" });
+      }
+      if (coupon.validUntil && new Date(coupon.validUntil) < now) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Coupon has expired" });
+      }
+
+      if (coupon.maxUses && coupon.currentUses >= coupon.maxUses) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Coupon usage limit reached" });
+      }
+
+      if (coupon.minAmount && input.amount < parseFloat(coupon.minAmount.toString())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Minimum amount required: ${coupon.minAmount}` });
+      }
+      if (coupon.maxAmount && input.amount > parseFloat(coupon.maxAmount.toString())) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Maximum amount allowed: ${coupon.maxAmount}` });
+      }
+
+      let discountAmount = 0;
+      if (coupon.discountType === "percentage") {
+        discountAmount = (input.amount * parseFloat(coupon.discountValue.toString())) / 100;
+      } else {
+        discountAmount = parseFloat(coupon.discountValue.toString());
+      }
+
+      return {
+        success: true,
+        couponCode: coupon.code,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        discountAmount,
+        finalAmount: input.amount - discountAmount,
+      };
     }),
 });

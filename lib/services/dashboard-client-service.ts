@@ -1,6 +1,4 @@
-import { authService } from './auth-client-service';
-
-const API_BASE_URL = 'http://localhost:3000/api';
+import { apiGet, apiPost } from './api-client';
 
 export interface DashboardStats {
   whatsappMessages: number;
@@ -24,98 +22,19 @@ export interface Payment {
 
 class DashboardClientService {
   async getStats(): Promise<DashboardStats> {
-    try {
-      const token = await authService.getToken();
-      if (!token) {
-        throw new Error('غير مصرح');
-      }
-
-      const response = await fetch(`${API_BASE_URL}/dashboard/stats`, {
-        headers: authService.getAuthHeader(),
-      });
-
-      if (!response.ok) {
-        throw new Error('فشل في الحصول على الإحصائيات');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Get stats error:', error);
-      throw error;
-    }
+    return apiGet<DashboardStats>('/api/dashboard/stats');
   }
 
   async getPayments(limit: number = 10): Promise<Payment[]> {
-    try {
-      const token = await authService.getToken();
-      if (!token) {
-        throw new Error('غير مصرح');
-      }
-
-      const response = await fetch(
-        `${API_BASE_URL}/dashboard/payments?limit=${limit}`,
-        {
-          headers: authService.getAuthHeader(),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('فشل في الحصول على المدفوعات');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Get payments error:', error);
-      throw error;
-    }
+    return apiGet<Payment[]>(`/api/dashboard/payments?limit=${limit}`);
   }
 
   async addCredit(amount: number): Promise<{ success: boolean; newBalance: number }> {
-    try {
-      const token = await authService.getToken();
-      if (!token) {
-        throw new Error('غير مصرح');
-      }
-
-      const response = await fetch(`${API_BASE_URL}/dashboard/add-credit`, {
-        method: 'POST',
-        headers: authService.getAuthHeader(),
-        body: JSON.stringify({ amount }),
-      });
-
-      if (!response.ok) {
-        throw new Error('فشل في إضافة الرصيد');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Add credit error:', error);
-      throw error;
-    }
+    return apiPost<{ success: boolean; newBalance: number }>('/api/dashboard/add-credit', { amount });
   }
 
   async upgradeSubscription(planId: string): Promise<{ success: boolean; newPlan: string }> {
-    try {
-      const token = await authService.getToken();
-      if (!token) {
-        throw new Error('غير مصرح');
-      }
-
-      const response = await fetch(`${API_BASE_URL}/dashboard/upgrade-plan`, {
-        method: 'POST',
-        headers: authService.getAuthHeader(),
-        body: JSON.stringify({ planId }),
-      });
-
-      if (!response.ok) {
-        throw new Error('فشل في ترقية الباقة');
-      }
-
-      return await response.json();
-    } catch (error) {
-      console.error('Upgrade subscription error:', error);
-      throw error;
-    }
+    return apiPost<{ success: boolean; newPlan: string }>('/api/dashboard/upgrade-plan', { planId });
   }
 }
 

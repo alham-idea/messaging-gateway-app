@@ -3,8 +3,26 @@ import { publicProcedure, protectedProcedure, router } from "../_core/trpc";
 import * as db from "../db";
 import { TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
+import { trpcHandler, findOrThrow } from "../_core/router-utils";
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+
+function generateToken(user: { id: number; email: string }): string {
+  return jwt.sign(
+    { userId: user.id, email: user.email },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+}
+
+async function createDefaultSubscription(userId: number, planId = 1) {
+  await db.createUserSubscription({
+    userId,
+    planId,
+    billingCycle: "monthly",
+    autoRenew: true,
+  });
+}
 
 export const authRouter = router({
   /**
@@ -20,7 +38,7 @@ export const authRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      try {
+      return trpcHandler(async () => {
         const existingEmail = await db.getUserByEmail(input.email);
         if (existingEmail) {
           throw new TRPCError({
@@ -29,52 +47,28 @@ export const authRouter = router({
           });
         }
 
-        // Create new user
         const result = await db.createUser({
           name: input.name,
           email: input.email,
           loginMethod: input.loginMethod,
         });
 
-        // Create user subscription
-        await db.createUserSubscription({
-          userId: result.id,
-          planId: input.planId,
-          billingCycle: "monthly",
-          autoRenew: true,
-        });
+        await createDefaultSubscription(result.id, input.planId);
 
-        // Generate JWT token
-        const user = await db.getUserById(result.id);
-        if (!user) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Failed to create user",
-          });
-        }
-
-        const token = jwt.sign(
-          { userId: user.id, email: user.email },
-          JWT_SECRET,
-          { expiresIn: "7d" }
+        const user = await findOrThrow(
+          () => db.getUserById(result.id),
+          "User",
+          "INTERNAL_SERVER_ERROR",
         );
+
+        const token = generateToken(user);
 
         return {
           success: true,
-          user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-          },
+          user: { id: user.id, name: user.name, email: user.email },
           token,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Registration failed",
-        });
-      }
+      }, "Registration failed");
     }),
 
   /**
@@ -90,10 +84,9 @@ export const authRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      try {
+      return trpcHandler(async () => {
         let user = await db.getUserByEmail(input.email);
-        
-        // Create user if doesn't exist
+
         if (!user) {
           const result = await db.createUser({
             name: input.name,
@@ -101,17 +94,9 @@ export const authRouter = router({
             loginMethod: input.loginMethod,
           });
 
-          // Create default subscription
-          await db.createUserSubscription({
-            userId: result.id,
-            planId: 1, // Default plan
-            billingCycle: "monthly",
-            autoRenew: true,
-          });
-
+          await createDefaultSubscription(result.id);
           user = await db.getUserById(result.id);
         } else {
-          // Update login method if provided
           if (input.loginMethod) {
             await db.updateUser(user.id, {
               loginMethod: input.loginMethod,
@@ -127,42 +112,24 @@ export const authRouter = router({
           });
         }
 
-        // Generate JWT token
-        const token = jwt.sign(
-          { userId: user.id, email: user.email },
-          JWT_SECRET,
-          { expiresIn: "7d" }
-        );
+        const token = generateToken(user);
 
         return {
           success: true,
-          user: {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-          },
+          user: { id: user.id, name: user.name, email: user.email },
           token,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Login failed",
-        });
-      }
+      }, "Login failed");
     }),
 
   /**
    * Get current user profile
    */
   me: protectedProcedure.query(async ({ ctx }) => {
-    const user = await db.getUserById(ctx.user.id);
-    if (!user) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "User not found",
-      });
-    }
+    const user = await findOrThrow(
+      () => db.getUserById(ctx.user.id),
+      "User",
+    );
 
     const subscription = await db.getUserSubscription(user.id);
     const plan = subscription ? await db.getSubscriptionPlan(subscription.planId) : null;
@@ -198,7 +165,7 @@ export const authRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try {
+      return trpcHandler(async () => {
         await db.updateUser(ctx.user.id, {
           name: input.name,
           email: input.email,
@@ -213,12 +180,7 @@ export const authRouter = router({
             email: user!.email,
           },
         };
-      } catch (error) {
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to update profile",
-        });
-      }
+      }, "Failed to update profile");
     }),
 
   /**
@@ -249,22 +211,16 @@ export const authRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      try {
-        const currentSubscription = await db.getUserSubscription(ctx.user.id);
-        if (!currentSubscription) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User has no active subscription",
-          });
-        }
+      return trpcHandler(async () => {
+        const currentSubscription = await findOrThrow(
+          () => db.getUserSubscription(ctx.user.id),
+          "User has no active subscription",
+        );
 
-        const newPlan = await db.getSubscriptionPlan(input.newPlanId);
-        if (!newPlan) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Plan not found",
-          });
-        }
+        const newPlan = await findOrThrow(
+          () => db.getSubscriptionPlan(input.newPlanId),
+          "Plan",
+        );
 
         const currentPlan = await db.getSubscriptionPlan(currentSubscription.planId);
         const changeType = currentPlan && newPlan.monthlyPrice > currentPlan.monthlyPrice ? "upgrade" : "downgrade";
@@ -275,12 +231,6 @@ export const authRouter = router({
           success: true,
           message: `Successfully ${changeType}d to ${newPlan.name}`,
         };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
-        throw new TRPCError({
-          code: "INTERNAL_SERVER_ERROR",
-          message: "Failed to upgrade subscription",
-        });
-      }
+      }, "Failed to upgrade subscription");
     }),
 });

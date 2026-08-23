@@ -54,8 +54,8 @@ export type InsertSubscriptionPlan = typeof subscriptionPlans.$inferInsert;
  */
 export const userSubscriptions = mysqlTable("userSubscriptions", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  planId: int("planId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
+  planId: int("planId").notNull().references(() => subscriptionPlans.id),
   status: mysqlEnum("status", ["active", "inactive", "suspended", "expired", "cancelled"]).default("active").notNull(),
   startDate: timestamp("startDate").defaultNow().notNull(),
   endDate: timestamp("endDate"),
@@ -74,9 +74,9 @@ export type InsertUserSubscription = typeof userSubscriptions.$inferInsert;
  */
 export const subscriptionHistory = mysqlTable("subscriptionHistory", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  fromPlanId: int("fromPlanId"),
-  toPlanId: int("toPlanId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
+  fromPlanId: int("fromPlanId").references(() => subscriptionPlans.id),
+  toPlanId: int("toPlanId").notNull().references(() => subscriptionPlans.id),
   changeType: mysqlEnum("changeType", ["upgrade", "downgrade", "initial", "renewal", "cancellation"]).notNull(),
   reason: text("reason"),
   effectiveDate: timestamp("effectiveDate").defaultNow().notNull(),
@@ -91,14 +91,14 @@ export type InsertSubscriptionHistory = typeof subscriptionHistory.$inferInsert;
  */
 export const payments = mysqlTable("payments", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 3 }).default("SAR").notNull(),
   paymentMethod: mysqlEnum("paymentMethod", ["credit_card", "bank_transfer", "wallet", "other"]).notNull(),
   paymentStatus: mysqlEnum("paymentStatus", ["pending", "completed", "failed", "refunded"]).default("pending").notNull(),
   transactionId: varchar("transactionId", { length: 255 }).unique(),
   description: text("description"),
-  invoiceId: int("invoiceId"),
+  invoiceId: int("invoiceId").references(() => invoices.id),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -111,7 +111,7 @@ export type InsertPayment = typeof payments.$inferInsert;
  */
 export const invoices = mysqlTable("invoices", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
   invoiceNumber: varchar("invoiceNumber", { length: 50 }).notNull().unique(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   taxAmount: decimal("taxAmount", { precision: 10, scale: 2 }).default("0.00"),
@@ -135,7 +135,7 @@ export type InsertInvoice = typeof invoices.$inferInsert;
  */
 export const usageStatistics = mysqlTable("usageStatistics", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
   date: datetime("date").notNull(),
   whatsappMessagesSent: int("whatsappMessagesSent").default(0).notNull(),
   whatsappMessagesFailed: int("whatsappMessagesFailed").default(0).notNull(),
@@ -193,7 +193,7 @@ export type InsertAdminUser = typeof adminUsers.$inferInsert;
  */
 export const devices = mysqlTable("devices", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
   phoneNumber: varchar("phoneNumber", { length: 20 }),
   deviceType: varchar("deviceType", { length: 50 }),
   status: mysqlEnum("status", ["online", "offline"]).default("offline").notNull(),
@@ -210,7 +210,7 @@ export type InsertDevice = typeof devices.$inferInsert;
  */
 export const paymentMethods = mysqlTable("paymentMethods", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
   methodType: mysqlEnum("methodType", ["credit_card", "debit_card", "bank_account", "wallet"]).notNull(),
   isDefault: boolean("isDefault").default(false).notNull(),
   stripePaymentMethodId: varchar("stripePaymentMethodId", { length: 255 }),
@@ -231,8 +231,8 @@ export type InsertPaymentMethod = typeof paymentMethods.$inferInsert;
  */
 export const refunds = mysqlTable("refunds", {
   id: int("id").autoincrement().primaryKey(),
-  paymentId: int("paymentId").notNull(),
-  userId: int("userId").notNull(),
+  paymentId: int("paymentId").notNull().references(() => payments.id),
+  userId: int("userId").notNull().references(() => users.id),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   reason: text("reason"),
   refundStatus: mysqlEnum("refundStatus", ["pending", "completed", "failed"]).default("pending").notNull(),
@@ -249,7 +249,7 @@ export type InsertRefund = typeof refunds.$inferInsert;
  */
 export const invoiceItems = mysqlTable("invoiceItems", {
   id: int("id").autoincrement().primaryKey(),
-  invoiceId: int("invoiceId").notNull(),
+  invoiceId: int("invoiceId").notNull().references(() => invoices.id),
   description: text("description").notNull(),
   quantity: int("quantity").default(1).notNull(),
   unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).notNull(),
@@ -265,9 +265,9 @@ export type InsertInvoiceItem = typeof invoiceItems.$inferInsert;
  */
 export const userCouponUsage = mysqlTable("userCouponUsage", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  couponId: int("couponId").notNull(),
-  invoiceId: int("invoiceId"),
+  userId: int("userId").notNull().references(() => users.id),
+  couponId: int("couponId").notNull().references(() => coupons.id),
+  invoiceId: int("invoiceId").references(() => invoices.id),
   discountAmount: decimal("discountAmount", { precision: 10, scale: 2 }).notNull(),
   usedAt: timestamp("usedAt").defaultNow().notNull(),
 });
@@ -281,7 +281,7 @@ export type InsertUserCouponUsage = typeof userCouponUsage.$inferInsert;
  */
 export const notifications = mysqlTable("notifications", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
   type: mysqlEnum("type", [
     "subscription_expiring",
     "subscription_expired",
@@ -319,7 +319,7 @@ export type InsertNotification = typeof notifications.$inferInsert;
  */
 export const notificationPreferences = mysqlTable("notificationPreferences", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().unique(),
+  userId: int("userId").notNull().unique().references(() => users.id),
   emailNotifications: boolean("emailNotifications").default(true).notNull(),
   pushNotifications: boolean("pushNotifications").default(true).notNull(),
   smsNotifications: boolean("smsNotifications").default(false).notNull(),
@@ -341,7 +341,7 @@ export type InsertNotificationPreference = typeof notificationPreferences.$infer
  */
 export const emailQueue = mysqlTable("emailQueue", {
   id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
+  userId: int("userId").notNull().references(() => users.id),
   recipientEmail: varchar("recipientEmail", { length: 320 }).notNull(),
   subject: varchar("subject", { length: 255 }).notNull(),
   htmlContent: text("htmlContent").notNull(),
@@ -366,8 +366,8 @@ export type InsertEmailQueueItem = typeof emailQueue.$inferInsert;
  */
 export const notificationHistory = mysqlTable("notificationHistory", {
   id: int("id").autoincrement().primaryKey(),
-  notificationId: int("notificationId").notNull(),
-  userId: int("userId").notNull(),
+  notificationId: int("notificationId").notNull().references(() => notifications.id),
+  userId: int("userId").notNull().references(() => users.id),
   channel: mysqlEnum("channel", ["in_app", "email", "push", "sms"]).notNull(),
   status: mysqlEnum("status", ["pending", "sent", "delivered", "failed", "bounced"]).default("pending").notNull(),
   sentAt: timestamp("sentAt"),

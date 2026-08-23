@@ -326,7 +326,7 @@ describe("errorHandlerMiddleware", () => {
 
   it("includes details in development mode", () => {
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "development";
+    Object.assign(process.env, { NODE_ENV: "development" });
 
     const err = new Error("dev error");
     const req = createMockReq();
@@ -337,7 +337,7 @@ describe("errorHandlerMiddleware", () => {
 
     expect((res._json as { details: string }).details).toBe("dev error");
 
-    process.env.NODE_ENV = originalEnv;
+    Object.assign(process.env, { NODE_ENV: originalEnv });
   });
 });
 
@@ -375,7 +375,7 @@ describe("securityHeadersMiddleware", () => {
 
   it("sets HSTS in production", () => {
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    Object.assign(process.env, { NODE_ENV: "production" });
 
     const req = createMockReq();
     const res = createMockRes();
@@ -385,12 +385,12 @@ describe("securityHeadersMiddleware", () => {
 
     expect(res._headers["Strict-Transport-Security"]).toContain("max-age=");
 
-    process.env.NODE_ENV = originalEnv;
+    Object.assign(process.env, { NODE_ENV: originalEnv });
   });
 
   it("does not set HSTS in development", () => {
     const originalEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "development";
+    Object.assign(process.env, { NODE_ENV: "development" });
 
     const req = createMockReq();
     const res = createMockRes();
@@ -400,7 +400,7 @@ describe("securityHeadersMiddleware", () => {
 
     expect(res._headers["Strict-Transport-Security"]).toBeUndefined();
 
-    process.env.NODE_ENV = originalEnv;
+    Object.assign(process.env, { NODE_ENV: originalEnv });
   });
 });
 

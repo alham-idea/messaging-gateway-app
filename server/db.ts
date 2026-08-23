@@ -157,6 +157,53 @@ export async function createSubscriptionPlan(planData: {
  * User Subscription Functions
  */
 
+async function lockUserForSubscription(tx: any, userId: number) {
+  // A no-op write obtains a row-level write lock even on MySQL-compatible
+  // providers where SELECT ... FOR UPDATE may be optimized differently.
+  await tx
+    .update(users)
+    .set({ updatedAt: sql`updatedAt` })
+    .where(eq(users.id, userId));
+
+  const lockedUser = await tx
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (lockedUser.length === 0) {
+    throw new Error("User not found");
+  }
+}
+
+async function getActiveSubscriptionsForUpdate(tx: any, userId: number) {
+  return tx
+    .select()
+    .from(userSubscriptions)
+    .where(and(
+      eq(userSubscriptions.userId, userId),
+      eq(userSubscriptions.status, "active"),
+    ))
+    .orderBy(asc(userSubscriptions.id))
+    .for("update");
+}
+
+function calculateSubscriptionEndDate(billingCycle: "monthly" | "yearly") {
+  const endDate = new Date();
+  if (billingCycle === "monthly") {
+    endDate.setMonth(endDate.getMonth() + 1);
+  } else {
+    endDate.setFullYear(endDate.getFullYear() + 1);
+  }
+  return endDate;
+}
+
+function assertAtMostOneActiveSubscription(activeSubscriptions: Array<{ id: number }>) {
+  if (activeSubscriptions.length > 1) {
+    throw new Error("User has multiple active subscriptions; reconciliation required");
+  }
+}
+
 export async function createUserSubscription(subscriptionData: {
   userId: number;
   planId: number;
@@ -166,27 +213,143 @@ export async function createUserSubscription(subscriptionData: {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  const endDate = new Date();
-  if (subscriptionData.billingCycle === "monthly") {
-    endDate.setMonth(endDate.getMonth() + 1);
-  } else {
-    endDate.setFullYear(endDate.getFullYear() + 1);
-  }
+  return db.transaction(async (tx) => {
+    await lockUserForSubscription(tx, subscriptionData.userId);
+    const activeSubscriptions = await getActiveSubscriptionsForUpdate(tx, subscriptionData.userId);
+    assertAtMostOneActiveSubscription(activeSubscriptions);
+    if (activeSubscriptions.length === 1) {
+      throw new Error("User already has an active subscription");
+    }
 
-  const nextBillingDate = new Date(endDate);
+    const endDate = calculateSubscriptionEndDate(subscriptionData.billingCycle);
+    await tx.insert(userSubscriptions).values({
+      userId: subscriptionData.userId,
+      planId: subscriptionData.planId,
+      status: "active",
+      billingCycle: subscriptionData.billingCycle,
+      autoRenew: subscriptionData.autoRenew ?? true,
+      endDate,
+      nextBillingDate: endDate,
+    });
 
-  await db.insert(userSubscriptions).values({
-    userId: subscriptionData.userId,
-    planId: subscriptionData.planId,
-    status: "active",
-    billingCycle: subscriptionData.billingCycle,
-    autoRenew: subscriptionData.autoRenew ?? true,
-    endDate,
-    nextBillingDate,
+    const [createdSubscription] = await tx
+      .select({ id: userSubscriptions.id })
+      .from(userSubscriptions)
+      .where(and(
+        eq(userSubscriptions.userId, subscriptionData.userId),
+        eq(userSubscriptions.status, "active"),
+      ))
+      .orderBy(desc(userSubscriptions.id))
+      .limit(1);
+
+    return { id: createdSubscription?.id || 0 };
   });
+} 
 
-  const subscriptions = await db.select().from(userSubscriptions).where(eq(userSubscriptions.userId, subscriptionData.userId));
-  return { id: subscriptions[subscriptions.length - 1]?.id || 0 };
+/**
+ * Atomically create, upgrade, or downgrade a user's subscription.
+ * The parent user row is locked first, so concurrent requests for the same
+ * user serialize even when no active subscription row exists yet.
+ */
+export async function changeUserSubscriptionAtomically(input: {
+  userId: number;
+  newPlanId: number;
+  billingCycle?: "monthly" | "yearly";
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return db.transaction(async (tx) => {
+    await lockUserForSubscription(tx, input.userId);
+
+    const [newPlan] = await tx
+      .select()
+      .from(subscriptionPlans)
+      .where(eq(subscriptionPlans.id, input.newPlanId))
+      .limit(1);
+    if (!newPlan) throw new Error("Plan not found");
+
+    const activeSubscriptions = await getActiveSubscriptionsForUpdate(tx, input.userId);
+    assertAtMostOneActiveSubscription(activeSubscriptions);
+
+    if (activeSubscriptions.length === 0) {
+      const billingCycle = input.billingCycle || "monthly";
+      const endDate = calculateSubscriptionEndDate(billingCycle);
+      await tx.insert(userSubscriptions).values({
+        userId: input.userId,
+        planId: input.newPlanId,
+        status: "active",
+        billingCycle,
+        autoRenew: true,
+        endDate,
+        nextBillingDate: endDate,
+      });
+      return {
+        action: "created" as const,
+        changeType: null,
+        planName: newPlan.name,
+      };
+    }
+
+    const currentSubscription = activeSubscriptions[0];
+    const currentPlan = currentSubscription.planId === newPlan.id
+      ? newPlan
+      : (await tx.select().from(subscriptionPlans).where(eq(subscriptionPlans.id, currentSubscription.planId)).limit(1))[0];
+    if (!currentPlan) throw new Error("Current subscription plan not found");
+
+    if (currentPlan.id === newPlan.id) {
+      return {
+        action: "unchanged" as const,
+        changeType: null,
+        planName: newPlan.name,
+      };
+    }
+
+    const changeType = newPlan.monthlyPrice > currentPlan.monthlyPrice ? "upgrade" as const : "downgrade" as const;
+    await tx.insert(subscriptionHistory).values({
+      userId: input.userId,
+      fromPlanId: currentSubscription.planId,
+      toPlanId: input.newPlanId,
+      changeType,
+    });
+
+    const endDate = calculateSubscriptionEndDate(currentSubscription.billingCycle);
+    await tx
+      .update(userSubscriptions)
+      .set({
+        planId: input.newPlanId,
+        endDate,
+        nextBillingDate: endDate,
+        updatedAt: new Date(),
+      })
+      .where(eq(userSubscriptions.id, currentSubscription.id));
+
+    return {
+      action: "changed" as const,
+      changeType,
+      planName: newPlan.name,
+    };
+  });
+}
+
+export async function cancelUserSubscription(userId: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  return db.transaction(async (tx) => {
+    await lockUserForSubscription(tx, userId);
+    const activeSubscriptions = await getActiveSubscriptionsForUpdate(tx, userId);
+    assertAtMostOneActiveSubscription(activeSubscriptions);
+    const subscription = activeSubscriptions[0];
+    if (!subscription) throw new Error("No active subscription");
+
+    await tx
+      .update(userSubscriptions)
+      .set({ status: "cancelled", endDate: new Date(), updatedAt: new Date() })
+      .where(eq(userSubscriptions.id, subscription.id));
+
+    return { id: subscription.id };
+  });
 }
 
 export async function getUserSubscription(userId: number) {
@@ -198,46 +361,62 @@ export async function getUserSubscription(userId: number) {
       eq(userSubscriptions.userId, userId),
       eq(userSubscriptions.status, "active")
     ))
+    .orderBy(desc(userSubscriptions.id))
     .limit(1);
 
   return result.length > 0 ? result[0] : undefined;
+}
+
+export async function getActiveUserSubscriptions(userId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(userSubscriptions)
+    .where(and(
+      eq(userSubscriptions.userId, userId),
+      eq(userSubscriptions.status, "active"),
+    ))
+    .orderBy(asc(userSubscriptions.id));
 }
 
 export async function updateUserSubscription(id: number, updates: any) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
 
-  await db.update(userSubscriptions).set(updates).where(eq(userSubscriptions.id, id));
+  if (updates.status !== "active") {
+    await db.update(userSubscriptions).set(updates).where(eq(userSubscriptions.id, id));
+    return;
+  }
+
+  await db.transaction(async (tx) => {
+    const [target] = await tx
+      .select({ id: userSubscriptions.id, userId: userSubscriptions.userId })
+      .from(userSubscriptions)
+      .where(eq(userSubscriptions.id, id))
+      .limit(1)
+      .for("update");
+    if (!target) throw new Error("Subscription not found");
+
+    await lockUserForSubscription(tx, target.userId);
+    const activeSubscriptions = await getActiveSubscriptionsForUpdate(tx, target.userId);
+    const anotherActiveSubscription = activeSubscriptions.some((subscription: { id: number }) => subscription.id !== target.id);
+    if (anotherActiveSubscription) {
+      throw new Error("User has multiple active subscriptions; reconciliation required");
+    }
+
+    await tx.update(userSubscriptions).set(updates).where(eq(userSubscriptions.id, id));
+  });
 }
 
 export async function upgradeSubscription(userId: number, newPlanId: number, changeType: "upgrade" | "downgrade") {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-
-  const currentSubscription = await getUserSubscription(userId);
-  if (!currentSubscription) throw new Error("User has no active subscription");
-
-  // Record history
-  await db.insert(subscriptionHistory).values({
-    userId,
-    fromPlanId: currentSubscription.planId,
-    toPlanId: newPlanId,
-    changeType,
-  });
-
-  // Update subscription
-  const endDate = new Date();
-  if (currentSubscription.billingCycle === "monthly") {
-    endDate.setMonth(endDate.getMonth() + 1);
-  } else {
-    endDate.setFullYear(endDate.getFullYear() + 1);
+  const result = await changeUserSubscriptionAtomically({ userId, newPlanId });
+  if (result.action === "created" || result.action === "unchanged") {
+    throw new Error("User has no active subscription change to apply");
   }
-
-  await updateUserSubscription(currentSubscription.id, {
-    planId: newPlanId,
-    endDate,
-    nextBillingDate: endDate,
-  });
+  if (result.changeType !== changeType) {
+    throw new Error("Subscription changed concurrently; please retry");
+  }
+  return result;
 }
 
 /**

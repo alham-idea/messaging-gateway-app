@@ -69,6 +69,30 @@ describe("Complete Subscription Flow Tests", () => {
       }
     });
 
+    it("should allow only one concurrent subscription creation", async () => {
+      const caller = appRouter.createCaller(ctx);
+      const plans = await caller.subscriptions.getPlans();
+
+      const results = await Promise.allSettled([
+        caller.subscriptions.changeSubscription({
+          newPlanId: plans[0].id,
+          billingCycle: "monthly",
+        }),
+        caller.subscriptions.changeSubscription({
+          newPlanId: plans[0].id,
+          billingCycle: "monthly",
+        }),
+      ]);
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(2);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(0);
+
+      const activeSubscriptions = await db.getActiveUserSubscriptions(testUserId);
+      expect(activeSubscriptions).toHaveLength(1);
+      expect(activeSubscriptions[0]?.status).toBe("active");
+      expect(activeSubscriptions[0]?.planId).toBe(plans[0].id);
+    });
+
     it("should initialize with correct plan limits", async () => {
       const caller = appRouter.createCaller(ctx);
       const plans = await caller.subscriptions.getPlans();

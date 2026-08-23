@@ -68,35 +68,32 @@ export const subscriptionsRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       return trpcHandler(async () => {
-        const newPlan = await findOrThrow(
-          () => db.getSubscriptionPlan(input.newPlanId),
-          "Plan",
-        );
+        const result = await db.changeUserSubscriptionAtomically({
+          userId: ctx.user.id,
+          newPlanId: input.newPlanId,
+          billingCycle: input.billingCycle,
+        });
 
-        const currentSubscription = await db.getUserSubscription(ctx.user.id);
-        if (!currentSubscription) {
-          await db.createUserSubscription({
-            userId: ctx.user.id,
-            planId: input.newPlanId,
-            billingCycle: input.billingCycle || "monthly",
-            autoRenew: true,
-          });
-
+        if (result.action === "created") {
           return {
             success: true,
-            message: `Successfully subscribed to ${newPlan.name}`,
+            message: `Successfully subscribed to ${result.planName}`,
+            changeType: null,
           };
         }
 
-        const currentPlan = await db.getSubscriptionPlan(currentSubscription.planId);
-        const changeType = currentPlan && newPlan.monthlyPrice > currentPlan.monthlyPrice ? "upgrade" : "downgrade";
-
-        await db.upgradeSubscription(ctx.user.id, input.newPlanId, changeType);
+        if (result.action === "unchanged") {
+          return {
+            success: true,
+            message: `Subscription is already active on ${result.planName}`,
+            changeType: null,
+          };
+        }
 
         return {
           success: true,
-          message: `Successfully ${changeType}d to ${newPlan.name}`,
-          changeType,
+          message: `Successfully ${result.changeType}d to ${result.planName}`,
+          changeType: result.changeType,
         };
       }, "Failed to change subscription");
     }),
@@ -121,9 +118,7 @@ export const subscriptionsRouter = router({
         "No active subscription",
       );
 
-      await db.updateUserSubscription(subscription.id, {
-        status: "cancelled",
-      });
+      await db.cancelUserSubscription(ctx.user.id);
 
       return {
         success: true,

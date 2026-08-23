@@ -64,10 +64,14 @@ async function startServer() {
   app.use(express.json({ limit: "1mb" }));
   app.use(express.urlencoded({ limit: "1mb", extended: true }));
 
-  // Serve admin dashboard
-  app.use("/admin", express.static("public/admin"));
+  // The admin UI is maintained and deployed as a separate Web App.
+  // Keep a compatibility redirect so old bookmarks do not load a stale embedded copy.
+  const adminDashboardUrl = "https://msgatewayadm-4pkhhml8.manus.space";
+  app.get("/admin", (_req, res) => {
+    res.redirect(302, adminDashboardUrl);
+  });
   app.get("/admin/*", (_req, res) => {
-    res.sendFile("public/admin/index.html", { root: process.cwd() });
+    res.redirect(302, adminDashboardUrl);
   });
 
   registerOAuthRoutes(app);
@@ -139,7 +143,7 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
-    console.log(`[admin] dashboard available at http://localhost:${port}/admin`);
+    console.log(`[admin] dashboard is maintained separately at ${adminDashboardUrl}`);
   });
 }
 

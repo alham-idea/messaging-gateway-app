@@ -152,3 +152,16 @@ Sent after the App attempts to process a message.
 
 1.  **Authentication**: Implement a handshake authentication mechanism (e.g., require the App to send a secret token in the query params) to prevent unauthorized devices from connecting to your server.
 2.  **SSL/TLS**: Always use `wss://` (HTTPS) in production to encrypt the communication.
+
+
+## Production Admin Dashboard CORS
+
+The standalone Admin Dashboard is served from `https://msgatewayadm-4pkhhml8.manus.space`. The central backend must include this exact origin in `CORS_ALLOWED_ORIGINS` (without a trailing slash), then be restarted and redeployed before browser login or browser-based Socket.io status updates can work.
+
+Example:
+
+```env
+CORS_ALLOWED_ORIGINS=https://msgatewayadm-4pkhhml8.manus.space
+```
+
+Native Android Socket.io clients are not subject to browser CORS, but the admin dashboard is. Keep authentication and database access on the central backend; do not place credentials in the dashboard bundle.

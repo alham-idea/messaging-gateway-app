@@ -34,3 +34,8 @@ Flexible plans managed via the Idea Backend (Basic, Professional, Enterprise) to
 1.  **Phone Number Format**: Always use international format (e.g., +966...).
 2.  **Device Maintenance**: Keep the gateway device plugged into power and connected to Wi-Fi.
 3.  **Screen Lock**: Disable screen lock or use a long timeout to prevent the OS from killing the background process (though the app uses WakeLocks).
+
+
+## Standalone Admin Dashboard Connectivity
+
+The standalone Admin Dashboard uses the central backend for authentication, operational metrics, subscriptions, invoices, and gateway status. For browser requests to succeed, configure `CORS_ALLOWED_ORIGINS` on the backend with the exact dashboard origin `https://msgatewayadm-4pkhhml8.manus.space`, without a trailing slash, then restart and redeploy the backend. The dashboard does not connect directly to the database and does not contain gateway credentials.

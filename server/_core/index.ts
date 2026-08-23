@@ -30,8 +30,18 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // CORS middleware — only allow configured origins
-  const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "").split(",").map(o => o.trim()).filter(Boolean);
+  // CORS middleware — allow configured origins plus the published admin dashboard.
+  // The explicit fallback keeps login working while a deployment picks up the env value.
+  const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map(o => o.trim())
+    .filter(Boolean);
+  const allowedOrigins = Array.from(
+    new Set([
+      ...configuredOrigins,
+      "https://msgatewayadm-4pkhhml8.manus.space",
+    ]),
+  );
   app.use((req, res, next) => {
     const origin = req.headers.origin;
     if (origin && allowedOrigins.includes(origin)) {

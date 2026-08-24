@@ -46,8 +46,15 @@ export default function MessagesScreen() {
     },
     {
       id: "2",
-      title: "السجل",
-      description: "عرض سجل جميع الرسائل",
+      title: "سجلات SMS",
+      description: "متابعة حالة الرسائل عبر الشريحة",
+      icon: "✉️",
+      route: "/sms-logs",
+    },
+    {
+      id: "5",
+      title: "السجل العام",
+      description: "عرض سجل جميع الرسائل والقنوات",
       icon: "📋",
       route: "/logs",
     },

@@ -238,11 +238,54 @@ class DatabaseService {
   public async getRecentMessages(limit: number = 20): Promise<DBMessage[]> {
     if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
 
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
     const result = await this.db.getAllAsync(
       `SELECT * FROM messages ORDER BY createdAt DESC LIMIT ?`,
-      [limit]
+      [safeLimit]
     );
     return result as DBMessage[];
+  }
+
+  /**
+   * Get outbound SMS delivery logs only.
+   */
+  public async getSmsDeliveryLogs(limit: number = 100): Promise<DBMessage[]> {
+    if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
+
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
+    const result = await this.db.getAllAsync(
+      `SELECT * FROM messages
+       WHERE type = 'sms' AND direction = 'outbound'
+       ORDER BY createdAt DESC LIMIT ?`,
+      [safeLimit]
+    );
+    return result as DBMessage[];
+  }
+
+  /**
+   * Get outbound SMS counts by delivery status.
+   */
+  public async getSmsDeliveryStats(): Promise<{ total: number; pending: number; processing: number; sent: number; failed: number }> {
+    if (!this.db) return { total: 0, pending: 0, processing: 0, sent: 0, failed: 0 };
+
+    const result = await this.db.getFirstAsync(`
+      SELECT
+        COUNT(*) as total,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+        COUNT(CASE WHEN status = 'processing' THEN 1 END) as processing,
+        COUNT(CASE WHEN status = 'sent' THEN 1 END) as sent,
+        COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed
+      FROM messages
+      WHERE type = 'sms' AND direction = 'outbound'
+    `) as any;
+
+    return {
+      total: Number(result?.total ?? 0),
+      pending: Number(result?.pending ?? 0),
+      processing: Number(result?.processing ?? 0),
+      sent: Number(result?.sent ?? 0),
+      failed: Number(result?.failed ?? 0),
+    };
   }
 
   /**

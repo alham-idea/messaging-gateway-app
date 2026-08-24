@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { socketService, MessagePayload } from '@/lib/services/socket-service';
 import { messageHandlerService, ProcessedMessage } from '@/lib/services/message-handler-service';
-import { whatsAppDesktopService } from '@/lib/services/whatsapp-desktop-service';
+import { whatsAppService } from '@/lib/services/whatsapp-service';
 import { logService } from '@/lib/services/log-service';
 
 export interface MessageStats {
@@ -45,7 +45,7 @@ export function useMessageHandler() {
   // تحديث الإحصائيات الشاملة
   const updateStats = useCallback(async () => {
     const socketStats = await messageHandlerService.getStats();
-    const whatsappStats = whatsAppDesktopService.getStats();
+    const whatsappStats = whatsAppService.getStats();
     const total = socketStats.sent + socketStats.failed;
 
     setStats({
@@ -80,57 +80,6 @@ export function useMessageHandler() {
     // معالجة الرسالة عبر معالج الرسائل
     messageHandlerService.handleIncomingMessage(payload);
 
-    // إذا كانت الرسالة موجهة للواتساب
-    if (payload.type === 'whatsapp') {
-      if (whatsAppDesktopService.isWhatsAppReady()) {
-        console.log('✓ إرسال الرسالة عبر واتساب');
-        
-        // إرسال الرسالة عبر واتساب
-        whatsAppDesktopService.sendMessage(
-          payload.phoneNumber,
-          payload.message,
-          payload.id
-        );
-
-        // تسجيل محاولة الإرسال
-        const event: WhatsAppMessageEvent = {
-          type: 'send',
-          phoneNumber: payload.phoneNumber,
-          message: payload.message,
-          messageId: payload.id,
-          timestamp: Date.now(),
-          status: 'pending',
-        };
-
-        setWhatsappEvents(prev => [event, ...prev].slice(0, 100));
-
-        logService.addLog({
-          type: 'whatsapp',
-          direction: 'sent',
-          status: 'sent',
-          message: `محاولة إرسال رسالة إلى ${payload.phoneNumber}`,
-          timestamp: Date.now(),
-        });
-      } else {
-        console.warn('⚠️ واتساب غير جاهز، إضافة الرسالة إلى الطابور');
-        
-        // إضافة الرسالة إلى الطابور
-        whatsAppDesktopService.sendMessage(
-          payload.phoneNumber,
-          payload.message,
-          payload.id
-        );
-
-        logService.addLog({
-          type: 'whatsapp',
-          direction: 'sent',
-          status: 'sent',
-          message: `تم إضافة الرسالة إلى الطابور (واتساب غير جاهز)`,
-          timestamp: Date.now(),
-        });
-      }
-    }
-
     updateStats();
   }, [updateStats]);
 
@@ -162,11 +111,10 @@ export function useMessageHandler() {
 
   // تثبيت المستمعين
   useEffect(() => {
-    // الاستماع لحدث الرسائل الواردة من Socket.io
-    socketService.on('send_message', handleIncomingMessage);
+    // يستمع SocketService للمسار المشترك مرة واحدة، لذلك لا نضيف مستمعاً مكرراً هنا.
 
     // الاستماع لحدث الرسائل الواردة من واتساب
-    const unsubscribeWhatsapp = whatsAppDesktopService.onMessageReceived(
+    const unsubscribeWhatsapp = whatsAppService.onMessageReceived(
       handleWhatsappIncomingMessage
     );
 
@@ -196,8 +144,8 @@ export function useMessageHandler() {
     // دوال الاستعلام
     getPendingCount: () => messageHandlerService.getPendingMessageCount(),
     getHistory: () => messageHandlerService.getMessageHistory(),
-    getWhatsappStats: () => whatsAppDesktopService.getStats(),
-    getWhatsappMessages: () => whatsAppDesktopService.getIncomingMessages(),
+    getWhatsappStats: () => whatsAppService.getStats(),
+    getWhatsappMessages: () => whatsAppService.getIncomingMessages(),
 
     // دوال التنظيف
     clearHistory: () => {
@@ -205,7 +153,7 @@ export function useMessageHandler() {
       updateStats();
     },
     clearWhatsappMessages: () => {
-      whatsAppDesktopService.clearIncomingMessages();
+      whatsAppService.clearIncomingMessages();
       updateStats();
     },
     clearWhatsappEvents: () => {
@@ -216,32 +164,36 @@ export function useMessageHandler() {
     sendWhatsappMessage: (phoneNumber: string, message: string, messageId: string) => {
       console.log(`📤 إرسال رسالة مباشرة عبر واتساب إلى ${phoneNumber}`);
       
-      whatsAppDesktopService.sendMessage(phoneNumber, message, messageId);
-
-      const event: WhatsAppMessageEvent = {
-        type: 'send',
+      void messageHandlerService.handleIncomingMessage({
+        id: messageId,
+        type: 'whatsapp',
         phoneNumber,
         message,
-        messageId,
         timestamp: Date.now(),
-        status: 'pending',
-      };
-
-      setWhatsappEvents(prev => [event, ...prev].slice(0, 100));
-
-      logService.addLog({
-        type: 'whatsapp',
-        direction: 'sent',
-        status: 'sent',
-        message: `إرسال رسالة مباشرة إلى ${phoneNumber}`,
-        timestamp: Date.now(),
+      }).then((accepted) => {
+        if (!accepted) return;
+        const event: WhatsAppMessageEvent = {
+          type: 'send',
+          phoneNumber,
+          message,
+          messageId,
+          timestamp: Date.now(),
+          status: 'pending',
+        };
+        setWhatsappEvents(prev => [event, ...prev].slice(0, 100));
+        logService.addLog({
+          type: 'whatsapp',
+          direction: 'sent',
+          status: 'pending',
+          message: `تمت جدولة رسالة WhatsApp ${messageId}`,
+          timestamp: Date.now(),
+        });
+        void updateStats();
       });
-
-      updateStats();
     },
 
     // دوال الحالة
-    isWhatsappReady: () => whatsAppDesktopService.isWhatsAppReady(),
-    isWhatsappDesktop: () => whatsAppDesktopService.isDesktop(),
+    isWhatsappReady: () => whatsAppService.isWhatsAppReady(),
+    isWhatsappDesktop: () => whatsAppService.isDesktop(),
   };
 }

@@ -56,7 +56,6 @@ class WhatsAppService {
       }
     } catch (error) {
       console.error('خطأ في معالجة رسالة WebView:', error);
-      throw error;
     }
   }
 
@@ -330,6 +329,26 @@ class WhatsAppService {
   }
 
   /**
+   * الحصول على إحصاءات خدمة WhatsApp الفعلية
+   */
+  public getStats() {
+    return {
+      isReady: this.isReady,
+      isDesktop: false,
+      pendingMessages: this.messageQueue.length,
+      incomingMessages: this.incomingMessages.length,
+      messageListeners: this.messageListeners.length,
+    };
+  }
+
+  /**
+   * التحقق من نسخة سطح المكتب
+   */
+  public isDesktop(): boolean {
+    return false;
+  }
+
+  /**
    * التحقق من جاهزية واتساب
    */
   public isWhatsAppReady(): boolean {
@@ -361,12 +380,12 @@ class WhatsAppService {
               if (text && sender && !msg.dataset.processed) {
                 msg.dataset.processed = 'true';
                 
-                window.postMessage({
+                window.ReactNativeWebView?.postMessage(JSON.stringify({
                   type: 'MESSAGE_RECEIVED',
                   phoneNumber: sender,
                   message: text,
                   timestamp: Date.now()
-                }, '*');
+                }));
               }
             });
           });

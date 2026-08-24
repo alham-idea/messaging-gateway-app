@@ -250,6 +250,13 @@ class SocketService {
   }
 
   /**
+   * إلغاء الاستماع لحدث مخصص
+   */
+  public off(event: string, callback: (...args: any[]) => void): void {
+    this.socket?.off(event, callback);
+  }
+
+  /**
    * إرسال حدث مخصص
    */
   public emit(event: string, data?: any): void {

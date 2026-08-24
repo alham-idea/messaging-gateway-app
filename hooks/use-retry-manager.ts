@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
 import { retryService, FailedMessage, RetryConfig } from '@/lib/services/retry-service';
-import { whatsAppDesktopService } from '@/lib/services/whatsapp-desktop-service';
 import { messageHandlerService } from '@/lib/services/message-handler-service';
 import { logService } from '@/lib/services/log-service';
 
@@ -36,26 +35,15 @@ export function useRetryManager() {
     console.log(`🔄 إعادة محاولة إرسال الرسالة ${message.id}`);
 
     if (message.channel === 'whatsapp') {
-      // إعادة محاولة عبر واتساب
-      if (whatsAppDesktopService.isWhatsAppReady()) {
-        console.log(`✓ إرسال الرسالة ${message.id} عبر واتساب`);
-        whatsAppDesktopService.sendMessage(
-          message.phoneNumber,
-          message.message,
-          message.id
-        );
-
-        logService.addLog({
-          type: 'whatsapp',
-          direction: 'sent',
-          status: 'sent',
-          message: `إعادة محاولة إرسال الرسالة ${message.id} عبر واتساب (محاولة ${message.attempts + 1})`,
-          timestamp: Date.now(),
-        });
-      } else {
-        console.warn(`⚠️ واتساب غير جاهز، سيتم إعادة المحاولة لاحقاً`);
-        // سيتم إعادة المحاولة تلقائياً من قبل retryService
-      }
+      console.log(`🔄 إعادة إدخال رسالة WhatsApp ${message.id} إلى قائمة الإرسال`);
+      void messageHandlerService.retryMessage(message.id);
+      logService.addLog({
+        type: 'whatsapp',
+        direction: 'sent',
+        status: 'pending',
+        message: `تمت جدولة إعادة محاولة رسالة WhatsApp ${message.id} (المحاولة ${message.attempts + 1})`,
+        timestamp: Date.now(),
+      });
     } else if (message.channel === 'sms') {
       // إعادة المحاولة عبر مسار SMS المركزي، ولا نسجل نجاحاً قبل تأكيد الموفر.
       console.log(`🔄 إعادة إدخال رسالة SMS ${message.id} إلى قائمة الإرسال`);

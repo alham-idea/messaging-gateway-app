@@ -172,3 +172,10 @@ CORS_ALLOWED_ORIGINS=https://msgatewayadm-4pkhhml8.manus.space
 ```
 
 Native Android Socket.io clients are not subject to browser CORS, but the admin dashboard is. Keep authentication and database access on the central backend; do not place credentials in the dashboard bundle.
+
+
+## WhatsApp channel isolation
+
+WhatsApp commands are accepted only with `type: "whatsapp"` and are routed through `messageHandlerService` to the active `whatsAppService` WebView adapter. The UI hook must not subscribe a second `send_message` listener or call a WhatsApp adapter directly; `socketService` owns the single inbound command listener and exposes `off()` for lifecycle cleanup. Messages remain `pending` while the WebView is not ready and are not reported as sent until the WebView acknowledgement is received.
+
+SMS commands continue through the independent `smsService` path. They must not be forwarded to WhatsApp, and WhatsApp readiness, queue length, events, and retry operations must not be reused as SMS state. WebView monitoring events must use `window.ReactNativeWebView.postMessage(JSON.stringify(...))` so the native `onMessage` handler receives them.

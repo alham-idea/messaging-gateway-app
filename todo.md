@@ -12183,3 +12183,55 @@
 - [x] نجاح TypeScript والبناء و10 اختبارات SMS
 - [ ] تجربة التفاعل فعلياً على Android بعد إنشاء build
 - [ ] حفظ checkpoint لهذه الجولة
+
+
+## تدقيق WhatsApp — بدء القسم
+- [ ] جرد شاشات وخدمات WhatsApp وWebView وSocket.io
+- [ ] جرد أحداث Socket ومسارات الرسائل المشتركة مع SMS
+- [ ] فحص دورة الاتصال وإعادة الاتصال وإدارة الموارد
+- [ ] فحص الطوابير والحالات ومنع التكرار والفشل
+- [ ] فحص عزل القناة في الرسائل والأوامر والإحصاءات
+- [ ] تحديث أدلة تكامل Socket.io وشرح الميزات عند الحاجة
+- [ ] تنفيذ الإصلاحات المؤكدة دون إرسال رسائل حقيقية
+- [ ] إضافة اختبارات حتمية لحالات WhatsApp والعزل
+- [ ] تشغيل TypeScript والاختبارات والبناء
+- [ ] قراءة todo.md قبل checkpoint
+- [ ] حفظ checkpoint وطلب اعتماد القسم التالي
+
+
+## تدقيق WhatsApp — نتائج الإصلاح الحالية
+- [x] جرد مسارات WhatsApp وWebView وSocket.io
+- [x] اكتشاف تضاعف استقبال `send_message` في hook مع SocketService
+- [x] إزالة الإرسال المباشر المكرر من `use-message-handler`
+- [x] توحيد hook وإعادة المحاولة مع `whatsAppService` المستخدم فعلياً في WebView
+- [x] إضافة `socketService.off` ومنع تراكم مستمعي Socket
+- [x] إبقاء رسائل WhatsApp pending حتى جاهزية WebView
+- [x] إصلاح جسر رسائل المراقبة من WebView إلى React Native
+- [x] منع تسجيل نجاح متفائل قبل قبول الرسالة في الطابور
+- [x] توثيق عدم خلط مسار SMS مع WhatsApp
+- [x] نجاح TypeScript والبناء و10 اختبارات SMS القائمة
+- [ ] إضافة اختبارات حتمية لمسار WhatsApp والطابور والعزل
+- [ ] تحديث أدلة التكامل العربي والإنجليزي
+- [ ] اختبار WebView وQR والإرسال على Android فعلي
+- [ ] مراجعة dead code لخدمة `whatsapp-desktop-service.ts`
+- [ ] قراءة todo.md قبل checkpoint
+- [ ] حفظ checkpoint لقسم WhatsApp
+
+
+## تدقيق WhatsApp — سجل الإنجاز
+- [x] إزالة مستمع Socket المكرر من `use-message-handler`
+- [x] منع الإرسال المباشر المكرر لرسالة WhatsApp
+- [x] توحيد شاشة WhatsApp وhook والمعالج على `whatsAppService`
+- [x] توحيد إعادة محاولة WhatsApp مع `messageHandlerService`
+- [x] إضافة `socketService.off` لتنظيف المستمعين
+- [x] إبقاء الرسالة pending حتى جاهزية WebView
+- [x] إصلاح `ReactNativeWebView.postMessage` في مراقب WebView
+- [x] إضافة دوال نقية واختبارات لعزل WhatsApp عن SMS
+- [x] تحديث أدلة Socket.io العربية والإنجليزية
+- [x] نجاح TypeScript والبناء و13 اختباراً مستهدفاً
+- [x] lint بلا أخطاء؛ بقيت 40 تحذيراً قائماً في ملفات عامة، منها تحذيرات سابقة في الشاشة والمكوّنات
+- [ ] اختبار WebView والإرسال وإعادة الاتصال على Android فعلي
+- [ ] مراجعة أو إزالة `whatsapp-desktop-service.ts` غير المستخدم في المسار الموحد
+- [ ] قراءة todo.md قبل checkpoint
+- [ ] حفظ checkpoint لقسم WhatsApp
+- [ ] طلب اعتماد المستخدم للانتقال إلى تدقيق Android الشامل

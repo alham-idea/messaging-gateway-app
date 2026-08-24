@@ -6,6 +6,7 @@ import { databaseService } from './database-service';
 import { subscriptionClientService } from './subscription-client-service';
 import { settingsService } from './settings-service';
 import { localNotificationService } from './local-notification-service';
+import { shouldDeferWhatsApp } from './whatsapp-channel-utils';
 
 export interface ProcessedMessage {
   id: string;
@@ -155,6 +156,15 @@ class MessageHandlerService {
 
       if (messages.length > 0) {
         const message = messages[0];
+
+        // إبقاء رسائل WhatsApp في الطابور حتى تصبح WebView جاهزة، دون خلطها مع SMS.
+        if (shouldDeferWhatsApp(message, whatsAppService.isWhatsAppReady())) {
+          setTimeout(() => {
+            this.isProcessing = false;
+            void this.processQueue();
+          }, 3000);
+          return;
+        }
         
         // Ensure we only process outbound messages here (status='pending')
         // DB query filters by status='pending', which is default for outbound.

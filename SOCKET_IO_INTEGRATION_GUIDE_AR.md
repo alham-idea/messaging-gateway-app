@@ -170,3 +170,10 @@ CORS_ALLOWED_ORIGINS=https://msgatewayadm-4pkhhml8.manus.space
 ```
 
 لا تخضع اتصالات تطبيق أندرويد الأصلية لقيود CORS الخاصة بالمتصفح، بينما تخضع لها لوحة التحكم. يجب إبقاء المصادقة والوصول إلى قاعدة البيانات داخل الخادم المركزي، وعدم وضع بيانات الاعتماد داخل ملفات الواجهة.
+
+
+## عزل قناة WhatsApp عن SMS
+
+تُقبل أوامر WhatsApp فقط عندما تكون قيمة `type` مساوية تماماً لـ `whatsapp`، ثم تمر عبر `messageHandlerService` إلى محول WebView الفعلي `whatsAppService`. لا يجوز لـ hook الواجهة تسجيل مستمع ثانٍ لحدث `send_message` أو استدعاء محول WhatsApp مباشرة؛ يحتفظ `socketService` بمستمع واحد للأوامر، ويوفر `off()` لتنظيف دورة الحياة. تبقى رسالة WhatsApp في حالة `pending` حتى تصبح WebView جاهزة، ولا تُرسل نتيجة `sent` قبل وصول تأكيد WebView.
+
+يستمر SMS عبر `smsService` المستقل، ولا يُعاد توجيهه إلى WhatsApp، كما لا يجوز مشاركة جاهزية WhatsApp أو طول طابوره أو أحداثه أو آلية إعادة محاولته مع حالة SMS. يجب أن تستخدم أحداث مراقبة WebView الصيغة `window.ReactNativeWebView.postMessage(JSON.stringify(...))` حتى تصل إلى معالج `onMessage` الأصلي في التطبيق.

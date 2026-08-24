@@ -72,23 +72,28 @@ io.on("connection", (socket) => {
 });
 
 // مثال: دالة لإرسال رسالة عبر البوابة المتصلة
-function sendWhatsApp(phoneNumber, text) {
+function sendMessage(type, phoneNumber, text) {
+  if (type !== 'whatsapp' && type !== 'sms') {
+    throw new Error('يجب أن يكون type هو whatsapp أو sms');
+  }
+
   const messagePayload = {
-    id: `msg_${Date.now()}`,
-    type: 'whatsapp',
-    phoneNumber: phoneNumber, // مثال: "+96650xxxxxxx"
+    id: `${type}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    phoneNumber,
     message: text,
     timestamp: Date.now()
   };
 
-  // إرسال الأمر لجميع البوابات المتصلة (أو يمكن تحديد socket id معين)
+  // أرسل إلى البوابة المستهدفة فقط في الإنتاج، وليس إلى جميع الأجهزة عشوائياً.
   io.emit("send_message", messagePayload);
-  console.log("📤 Command sent to Gateway");
+  console.log(`📤 تم إرسال أمر ${type} إلى البوابة`);
 }
 
-// تجربة إرسال رسالة بعد 10 ثواني
+// بالنسبة إلى SMS، انتظر message_response بحالة sent.
+// مسار SMS الخلفي يتطلب DirectSms داخل عميل Android المخصص.
 setTimeout(() => {
-  sendWhatsApp("+966500000000", "مرحباً من السيرفر الخاص بي!");
+  sendMessage("sms", "+966500000000", "مرحباً من سيرفري!");
 }, 10000);
 ```
 
@@ -111,7 +116,9 @@ setTimeout(() => {
   "timestamp": 1715421234567
 }
 ```
-*   `type`: يمكن أن يكون `"whatsapp"` أو `"sms"`.
+*   `type`: حقل مطلوب ويجب أن يكون بالضبط `"whatsapp"` أو `"sms"`؛ لا يتم افتراض WhatsApp عند غياب النوع.
+*   عند استخدام `"sms"` يجب أن يوفّر عميل Android المخصص الوحدة `DirectSms.sendSms`. محرر SMS الموجه للمستخدم مسار منفصل ولا يمثل تأكيداً للإرسال الخلفي.
+*   تعني حالة `sent` نجاح استدعاء إرسال SMS الأصلي فقط. أما غياب الوحدة أو فشل التحقق أو تجاوز الحصة أو فشل الجهاز/الموفر فينتج حالة `failed`.
 
 ### 2. من التطبيق -> إلى السيرفر (تقارير)
 

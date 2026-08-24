@@ -163,15 +163,20 @@ class CommandHandlerService {
         throw new Error('بيانات الرسالة غير كاملة');
       }
 
+      if (payload.type !== 'whatsapp' && payload.type !== 'sms') {
+        throw new Error('نوع القناة مطلوب ويجب أن يكون whatsapp أو sms');
+      }
+
       const messagePayload = {
-        id: `msg_${Date.now()}`,
-        type: (payload.type || 'whatsapp') as 'whatsapp' | 'sms',
+        id: `${payload.type}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        type: payload.type,
         phoneNumber: payload.phoneNumber,
         message: payload.message,
         timestamp: Date.now(),
-      };
+      } as const;
 
-      await messageHandlerService.handleIncomingMessage(messagePayload);
+      const queued = await messageHandlerService.handleIncomingMessage(messagePayload);
+      if (!queued) throw new Error('تعذر إضافة الرسالة إلى الطابور');
 
       return {
         success: true,
@@ -187,14 +192,15 @@ class CommandHandlerService {
       }
 
       const messagePayload = {
-        id: `sms_${Date.now()}`,
+        id: `sms_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         type: 'sms' as const,
         phoneNumber: payload.phoneNumber,
         message: payload.message,
         timestamp: Date.now(),
       };
 
-      await messageHandlerService.handleIncomingMessage(messagePayload);
+      const queued = await messageHandlerService.handleIncomingMessage(messagePayload);
+      if (!queued) throw new Error('تعذر إضافة رسالة SMS إلى الطابور');
 
       return {
         success: true,

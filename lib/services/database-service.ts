@@ -89,8 +89,12 @@ class DatabaseService {
     const now = Date.now();
     const status = direction === 'inbound' ? 'received' : 'pending';
     
+    if (payload.type !== 'sms' && payload.type !== 'whatsapp') {
+      throw new Error('INVALID_MESSAGE_TYPE');
+    }
+
     await this.db.runAsync(
-      `INSERT OR REPLACE INTO messages (id, type, phoneNumber, message, status, direction, timestamp, createdAt, updatedAt)
+      `INSERT OR IGNORE INTO messages (id, type, phoneNumber, message, status, direction, timestamp, createdAt, updatedAt)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         payload.id,
@@ -111,10 +115,11 @@ class DatabaseService {
    */
   public async getPendingMessages(limit: number = 10): Promise<DBMessage[]> {
     if (!this.db) throw new Error('قاعدة البيانات غير مهيأة');
+    const safeLimit = Math.max(1, Math.min(100, Math.floor(limit)));
 
     const result = await this.db.getAllAsync(
-      `SELECT * FROM messages WHERE status = 'pending' ORDER BY createdAt ASC LIMIT ?`,
-      [limit]
+      `SELECT * FROM messages WHERE status = 'pending' AND direction = 'outbound' ORDER BY createdAt ASC LIMIT ?`,
+      [safeLimit]
     );
     
     return result;

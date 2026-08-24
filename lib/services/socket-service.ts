@@ -105,7 +105,9 @@ class SocketService {
         // معالج استقبال الأوامر من المنصة
         this.socket.on('send_message', (payload: MessagePayload) => {
           console.log('📨 رسالة واردة من المنصة:', payload);
-          this.handleIncomingMessage(payload);
+          void this.handleIncomingMessage(payload).catch((error) => {
+            console.error('❌ فشل معالجة أمر الرسالة الوارد:', error);
+          });
         });
 
         // معالج الأخطاء العامة

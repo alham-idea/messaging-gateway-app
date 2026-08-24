@@ -57,14 +57,14 @@ export function useRetryManager() {
         // سيتم إعادة المحاولة تلقائياً من قبل retryService
       }
     } else if (message.channel === 'sms') {
-      // إعادة محاولة عبر SMS
-      console.log(`✓ إرسال الرسالة ${message.id} عبر SMS`);
-      // يمكن إضافة منطق إرسال SMS هنا
+      // إعادة المحاولة عبر مسار SMS المركزي، ولا نسجل نجاحاً قبل تأكيد الموفر.
+      console.log(`🔄 إعادة إدخال رسالة SMS ${message.id} إلى قائمة الإرسال`);
+      void messageHandlerService.retryMessage(message.id);
       logService.addLog({
         type: 'sms',
         direction: 'sent',
-        status: 'sent',
-        message: `إعادة محاولة إرسال الرسالة ${message.id} عبر SMS (محاولة ${message.attempts + 1})`,
+        status: 'pending',
+        message: `تمت جدولة إعادة محاولة رسالة SMS ${message.id} (المحاولة ${message.attempts + 1})`,
         timestamp: Date.now(),
       });
     }

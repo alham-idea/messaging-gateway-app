@@ -1,5 +1,6 @@
 import * as SMS from 'expo-sms';
 import { Platform, NativeModules, DeviceEventEmitter } from 'react-native';
+import { normalizeSmsPhoneNumber } from './sms-validation';
 
 export interface SmsMessage {
   id: string;
@@ -8,6 +9,7 @@ export interface SmsMessage {
   date: number;
   read: boolean;
 }
+
 
 /**
  * Service for handling SMS operations (Sending, Reading, Listening)
@@ -24,28 +26,45 @@ class SmsService {
    * Uses expo-sms (opens composer) or native module if available for direct send
    */
   public async sendSms(phoneNumber: string, message: string): Promise<void> {
-    if (Platform.OS === 'web') {
-      throw new Error('SMS not supported on web');
+    if (Platform.OS !== 'android') {
+      throw new Error('DIRECT_SMS_REQUIRES_ANDROID');
     }
 
-    // Try to use direct SMS if available (requires native module)
-    // if (NativeModules.DirectSms) { ... }
-    
-    // Fallback to Expo SMS (opens composer)
-    const isAvailable = await SMS.isAvailableAsync();
-    if (!isAvailable) {
-      throw new Error('SMS service not available on this device');
+    const normalizedPhone = normalizeSmsPhoneNumber(phoneNumber);
+    const normalizedMessage = message.trim();
+    if (!normalizedPhone) throw new Error('INVALID_PHONE_NUMBER');
+    if (!normalizedMessage) throw new Error('EMPTY_SMS_MESSAGE');
+    if (normalizedMessage.length > 1600) throw new Error('SMS_MESSAGE_TOO_LONG');
+
+    const directSms = NativeModules.DirectSms;
+    if (!directSms || typeof directSms.sendSms !== 'function') {
+      throw new Error('DIRECT_SMS_MODULE_UNAVAILABLE');
     }
 
-    const { result } = await SMS.sendSMSAsync(
-      [phoneNumber],
-      message
-    );
-
-    if (result !== 'sent' && result !== 'unknown') {
-      throw new Error(`SMS send failed: ${result}`);
+    const result = await directSms.sendSms(normalizedPhone, normalizedMessage);
+    if (result === false || result?.success === false) {
+      throw new Error('DIRECT_SMS_SEND_FAILED');
     }
   }
+
+  /**
+   * Explicit user-facing composer fallback. This is not used by the background queue
+   * because opening a composer is not delivery confirmation.
+   */
+  public async composeSms(phoneNumber: string, message: string): Promise<'sent' | 'cancelled' | 'unknown'> {
+    if (Platform.OS === 'web') throw new Error('SMS not supported on web');
+    const normalizedPhone = normalizeSmsPhoneNumber(phoneNumber);
+    const normalizedMessage = message.trim();
+    if (!normalizedPhone) throw new Error('INVALID_PHONE_NUMBER');
+    if (!normalizedMessage) throw new Error('EMPTY_SMS_MESSAGE');
+    if (normalizedMessage.length > 1600) throw new Error('SMS_MESSAGE_TOO_LONG');
+
+    const isAvailable = await SMS.isAvailableAsync();
+    if (!isAvailable) throw new Error('SMS_COMPOSER_UNAVAILABLE');
+    const { result } = await SMS.sendSMSAsync([normalizedPhone], normalizedMessage);
+    return result;
+  }
+
 
   /**
    * Get last N messages
@@ -133,13 +152,17 @@ class SmsService {
       this.isListening = true;
       // Assume Event Emitter pattern if module doesn't have explicit addListener method
       this.smsListener = DeviceEventEmitter.addListener('SmsReceived', (event: any) => {
-         const message: SmsMessage = {
-           id: `sms_${Date.now()}_${Math.random()}`,
-           address: event.originatingAddress,
-           body: event.body,
-           date: Date.now(),
-           read: false
-         };
+           const address = typeof event.originatingAddress === 'string' ? event.originatingAddress : '';
+           const body = typeof event.body === 'string' ? event.body : '';
+           const date = Number(event.timestamp || event.date || Date.now());
+           if (!address || !body) return;
+           const message: SmsMessage = {
+             id: String(event._id || event.messageId || `sms_${address}_${date}_${body}`),
+             address,
+             body,
+             date,
+             read: false
+           };
          onMessage(message);
       });
       

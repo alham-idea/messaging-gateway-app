@@ -72,23 +72,28 @@ io.on("connection", (socket) => {
 });
 
 // Example: Function to send a message via the connected Gateway
-function sendWhatsApp(phoneNumber, text) {
+function sendMessage(type, phoneNumber, text) {
+  if (type !== 'whatsapp' && type !== 'sms') {
+    throw new Error('type must be whatsapp or sms');
+  }
+
   const messagePayload = {
-    id: `msg_${Date.now()}`,
-    type: 'whatsapp',
-    phoneNumber: phoneNumber, // e.g., "+96650xxxxxxx"
+    id: `${type}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    type,
+    phoneNumber,
     message: text,
     timestamp: Date.now()
   };
 
-  // Emit to all connected gateways (or filter by specific socket ID)
+  // Emit to the selected gateway, not blindly to every device in production.
   io.emit("send_message", messagePayload);
-  console.log("📤 Command sent to Gateway");
+  console.log(`📤 ${type} command sent to Gateway`);
 }
 
-// Test sending a message after 10 seconds
+// For SMS, use a unique id and wait for message_response.status === 'sent'.
+// The Android background path requires DirectSms in the custom client.
 setTimeout(() => {
-  sendWhatsApp("+966500000000", "Hello from my custom server!");
+  sendMessage("sms", "+966500000000", "Hello from my custom server!");
 }, 10000);
 ```
 
@@ -111,7 +116,9 @@ Emit this event to trigger a message send on the device.
   "timestamp": 1715421234567
 }
 ```
-*   `type`: Can be `"whatsapp"` or `"sms"`.
+*   `type`: Required and must be exactly `"whatsapp"` or `"sms"`; an omitted type is rejected and is never defaulted to WhatsApp.
+*   For `"sms"`, the Android custom client must expose `DirectSms.sendSms`. The user-facing SMS composer is separate and is not background delivery confirmation.
+*   A `sent` response means the native SMS send call succeeded. Missing native support, invalid input, quota rejection, and device/provider errors produce `failed`.
 
 ### 2. App -> Server (Reports)
 

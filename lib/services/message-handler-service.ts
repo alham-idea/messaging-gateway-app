@@ -44,7 +44,7 @@ class MessageHandlerService {
   /**
    * Handle incoming message from Socket (Outbound)
    */
-  public async handleIncomingMessage(payload: MessagePayload): Promise<void> {
+  public async handleIncomingMessage(payload: MessagePayload): Promise<boolean> {
     console.log('📨 Received message:', payload);
 
     try {
@@ -63,14 +63,15 @@ class MessageHandlerService {
           error: 'quota_exceeded',
           timestamp: Date.now()
         });
-        return;
+        return false;
       }
 
       // 3. Save to database (Persistent Queue)
       await databaseService.addMessage(payload, 'outbound');
       
       // 4. Trigger processing
-      this.processQueue();
+      void this.processQueue();
+      return true;
     } catch (error) {
       console.error('❌ Failed to queue message:', error);
       this.sendResponse({
@@ -80,6 +81,7 @@ class MessageHandlerService {
         error: error instanceof Error ? error.message : 'Failed to save message to queue',
         timestamp: Date.now()
       });
+      return false;
     }
   }
 

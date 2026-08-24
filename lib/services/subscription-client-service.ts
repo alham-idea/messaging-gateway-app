@@ -4,6 +4,16 @@ import { databaseService } from "./database-service";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "http://localhost:3000";
 
+function readTrpcResult<T>(response: { data: any }): T {
+  const data = response.data?.result?.data;
+  if (data && typeof data === "object" && "json" in data) return data.json as T;
+  return (data ?? response.data) as T;
+}
+
+function queryConfig(input?: Record<string, unknown>) {
+  return input ? { params: { input: JSON.stringify({ json: input }) } } : undefined;
+}
+
 interface Plan {
   id: number;
   name: string;
@@ -153,8 +163,8 @@ class SubscriptionClientService {
    */
   async getPlans(): Promise<Plan[]> {
     try {
-      const response = await this.apiClient.get("/api/subscriptions.getPlans");
-      return response.data;
+      const response = await this.apiClient.get("/api/trpc/subscriptions.getPlans");
+      return readTrpcResult(response);
     } catch (error) {
       // Fallback to local catalog
       console.warn("Failed to fetch plans from API. Falling back to local catalog.");
@@ -179,10 +189,8 @@ class SubscriptionClientService {
    */
   async getPlan(id: number): Promise<Plan> {
     try {
-      const response = await this.apiClient.get("/api/subscriptions.getPlan", {
-        params: { id },
-      });
-      return response.data;
+      const response = await this.apiClient.get("/api/trpc/subscriptions.getPlan", queryConfig({ id }));
+      return readTrpcResult(response);
     } catch (error) {
       console.warn("Failed to fetch plan from API. Using local catalog.");
       const p = buildLocalPlans().find((x) => x.id === id);
@@ -208,8 +216,8 @@ class SubscriptionClientService {
    */
   async getCurrentSubscription(): Promise<UserSubscription | null> {
     try {
-      const response = await this.apiClient.get("/api/subscriptions.getCurrentSubscription");
-      return response.data;
+      const response = await this.apiClient.get("/api/trpc/subscriptions.getCurrentSubscription");
+      return readTrpcResult(response);
     } catch (error) {
       console.warn("Failed to fetch current subscription. Falling back to local trial.");
       // Fallback: trial subscription (once) stored locally
@@ -244,11 +252,10 @@ class SubscriptionClientService {
     billingCycle?: "monthly" | "yearly"
   ): Promise<{ success: boolean; message: string; changeType?: string }> {
     try {
-      const response = await this.apiClient.post("/api/subscriptions.changeSubscription", {
-        newPlanId,
-        billingCycle,
+      const response = await this.apiClient.post("/api/trpc/subscriptions.changeSubscription", {
+        json: { newPlanId, billingCycle },
       });
-      return response.data;
+      return readTrpcResult(response);
     } catch (error) {
       console.error("Failed to change subscription:", error);
       throw error;
@@ -260,8 +267,8 @@ class SubscriptionClientService {
    */
   async getHistory(): Promise<any[]> {
     try {
-      const response = await this.apiClient.get("/api/subscriptions.getHistory");
-      return response.data;
+      const response = await this.apiClient.get("/api/trpc/subscriptions.getHistory");
+      return readTrpcResult(response);
     } catch (error) {
       console.error("Failed to fetch subscription history:", error);
       throw error;
@@ -273,8 +280,8 @@ class SubscriptionClientService {
    */
   async cancel(): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await this.apiClient.post("/api/subscriptions.cancel");
-      return response.data;
+      const response = await this.apiClient.post("/api/trpc/subscriptions.cancel");
+      return readTrpcResult(response);
     } catch (error) {
       console.error("Failed to cancel subscription:", error);
       throw error;
@@ -291,8 +298,8 @@ class SubscriptionClientService {
   } | null> {
     try {
       // محاولة من الـ API أولاً
-      const response = await this.apiClient.get("/api/subscriptions.getUsageStats");
-      return response.data;
+      const response = await this.apiClient.get("/api/trpc/subscriptions.getUsageStats");
+      return readTrpcResult(response);
     } catch (error) {
       // حساب محلي: يعتمد على SQLite للفترة النشطة
       console.warn("Failed to fetch usage stats from API. Computing locally.");
@@ -308,32 +315,24 @@ class SubscriptionClientService {
       const counts = await databaseService.getSentCounts(start, end);
       const receivedCounts = await databaseService.getReceivedCounts(start, end);
 
-      const localCatalog = buildLocalPlans();
-      const localPlan = localCatalog.find(p => p.id === sub.planId) || localCatalog[0];
-
-      const isSendUnlimited = String(localPlan.sendLimitTotal).toLowerCase() === 'unlimited';
-      const sendLimit = isSendUnlimited ? Number.MAX_SAFE_INTEGER : Number(localPlan.sendLimitTotal);
-      
-      const isRecvUnlimited = String(localPlan.recvLimitTotal).toLowerCase() === 'unlimited';
-      const recvLimit = isRecvUnlimited ? Number.MAX_SAFE_INTEGER : Number(localPlan.recvLimitTotal);
-
-      const totalSent = counts.total;
-      const totalRecv = receivedCounts.total;
+      const whatsappLimit = Number(plan.whatsappMessagesLimit);
+      const smsLimit = Number(plan.smsMessagesLimit);
+      const whatsappReceiveLimit = Number(plan.whatsappMessagesLimit);
+      const smsReceiveLimit = Number(plan.smsMessagesLimit);
 
       const usage: UsageStats = {
         whatsappUsed: counts.whatsapp,
-        whatsappLimit: sendLimit,
-        whatsappRemaining: Math.max(0, sendLimit - totalSent),
+        whatsappLimit,
+        whatsappRemaining: Math.max(0, whatsappLimit - counts.whatsapp),
         smsUsed: counts.sms,
-        smsLimit: sendLimit,
-        smsRemaining: Math.max(0, sendLimit - totalSent),
-        
+        smsLimit,
+        smsRemaining: Math.max(0, smsLimit - counts.sms),
         whatsappReceived: receivedCounts.whatsapp,
-        whatsappReceiveLimit: recvLimit,
-        whatsappReceiveRemaining: Math.max(0, recvLimit - totalRecv),
+        whatsappReceiveLimit,
+        whatsappReceiveRemaining: Math.max(0, whatsappReceiveLimit - receivedCounts.whatsapp),
         smsReceived: receivedCounts.sms,
-        smsReceiveLimit: recvLimit,
-        smsReceiveRemaining: Math.max(0, recvLimit - totalRecv),
+        smsReceiveLimit,
+        smsReceiveRemaining: Math.max(0, smsReceiveLimit - receivedCounts.sms),
       };
 
       return { subscription: sub, plan, usage };
@@ -358,22 +357,17 @@ class SubscriptionClientService {
         sub ? p.id === sub.planId : p.id === 0
       ) || localCatalog[0];
 
-      // غير محدود
-      if (local.sendLimitTotal === "unlimited") return true;
+      const channelLimit = activePlan
+        ? (type === "sms" ? activePlan.smsMessagesLimit : activePlan.whatsappMessagesLimit)
+        : local.sendLimitTotal;
+      if (String(channelLimit).toLowerCase() === "unlimited") return true;
 
-      // فترة الحساب
       const periodStart = sub ? new Date(sub.startDate).getTime() : Date.now();
       const periodEnd = sub ? new Date(sub.endDate).getTime() : Date.now() + 14 * 24 * 60 * 60 * 1000;
-
-      // استخدام محلي من SQLite
       const counts = await databaseService.getSentCounts(periodStart, periodEnd);
-      const totalSent = counts.total;
-      
-      const isUnlimited = String(local.sendLimitTotal).toLowerCase() === 'unlimited';
-      const totalLimit = isUnlimited ? Number.MAX_SAFE_INTEGER : Number(local.sendLimitTotal);
-
-      // التحقق مقابل الحد الإجمالي (WA + SMS)
-      return totalSent < totalLimit;
+      const channelSent = type === "sms" ? counts.sms : counts.whatsapp;
+      const channelLimitNumber = Number(channelLimit);
+      return channelSent < channelLimitNumber;
     } catch (error) {
       console.error("Failed to check message limit:", error);
       return false;

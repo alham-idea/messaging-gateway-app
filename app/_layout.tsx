@@ -40,8 +40,9 @@ export default function RootLayout() {
   useEffect(() => {
     const openSmsLogsFromNotification = (response: Notifications.NotificationResponse | null) => {
       const data = response?.notification.request.content.data;
-      if (parseSmsFailureNotificationData(data)) {
-        router.push('/sms-logs');
+      const parsed = parseSmsFailureNotificationData(data);
+      if (parsed) {
+        router.push({ pathname: '/sms-logs', params: { messageId: parsed.messageId } });
       }
     };
 

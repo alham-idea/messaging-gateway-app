@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
@@ -52,6 +52,7 @@ function formatTime(timestamp: number): string {
 export default function SmsLogsScreen() {
   const colors = useColors();
   const isFocused = useIsFocused();
+  const { messageId } = useLocalSearchParams<{ messageId?: string }>();
   const [logs, setLogs] = useState<DBMessage[]>([]);
   const [stats, setStats] = useState({ total: 0, pending: 0, processing: 0, sent: 0, failed: 0 });
   const [filter, setFilter] = useState<SmsLogFilter>('all');
@@ -60,6 +61,7 @@ export default function SmsLogsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(messageId ?? null);
   const [error, setError] = useState<string | null>(null);
 
   const loadLogs = useCallback(async (isRefresh = false) => {
@@ -87,6 +89,11 @@ export default function SmsLogsScreen() {
   }, [isFocused, loadLogs]));
 
   const visibleLogs = useMemo(() => filterSmsLogsAdvanced(logs, filter, search), [logs, filter, search]);
+  const selectedLog = useMemo(() => logs.find((item) => item.id === selectedId) ?? null, [logs, selectedId]);
+
+  useEffect(() => {
+    if (messageId) setSelectedId(messageId);
+  }, [messageId]);
 
   const retry = useCallback(async (item: DBMessage) => {
     setRetryingId(item.id);
@@ -121,7 +128,12 @@ export default function SmsLogsScreen() {
     const tone = statusColorMap[smsStatusColor(item.status)];
     const toneColor = colors[tone];
     return (
-      <View className="mb-3 rounded-2xl border border-border bg-surface p-4">
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ selected: selectedId === item.id }}
+        onPress={() => setSelectedId(item.id)}
+        style={({ pressed }) => ({ marginBottom: 12, borderRadius: 16, borderWidth: selectedId === item.id ? 2 : 1, borderColor: selectedId === item.id ? colors.primary : colors.border, backgroundColor: colors.surface, padding: 16, opacity: pressed ? 0.82 : 1 })}
+      >
         <View className="flex-row items-start">
           <View className="mr-3 h-10 w-10 items-center justify-center rounded-full" style={{ backgroundColor: `${toneColor}20` }}>
             <Text className="text-lg font-bold" style={{ color: toneColor }}>{smsStatusIcon(item.status)}</Text>
@@ -159,7 +171,7 @@ export default function SmsLogsScreen() {
             {item.error ? <Text className="mt-2 text-xs leading-5 text-error" numberOfLines={2}>{item.error}</Text> : null}
           </View>
         </View>
-      </View>
+      </Pressable>
     );
   };
 
@@ -243,6 +255,32 @@ export default function SmsLogsScreen() {
                 >
                   <Text className="font-semibold text-primary">مسح البحث</Text>
                 </Pressable>
+              </View>
+            )}
+            {selectedLog && (
+              <View className="mb-4 rounded-2xl border border-primary bg-surface p-4">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-base font-bold text-foreground">تفاصيل السجل المحدد</Text>
+                  <Pressable onPress={() => setSelectedId(null)} style={({ pressed }) => ({ padding: 6, opacity: pressed ? 0.6 : 1 })}>
+                    <Text className="font-semibold text-primary">إغلاق</Text>
+                  </Pressable>
+                </View>
+                <Text className="mt-3 text-sm text-foreground">المستلم: {maskPhoneNumber(selectedLog.phoneNumber)}</Text>
+                <Text className="mt-1 text-sm text-muted">الوقت: {formatTime(selectedLog.createdAt || selectedLog.timestamp)}</Text>
+                <Text className="mt-1 text-sm text-muted">المحاولات: {selectedLog.retryCount}</Text>
+                <Text className="mt-3 text-sm leading-5 text-foreground">{selectedLog.message}</Text>
+                {selectedLog.error ? <Text className="mt-2 text-sm leading-5 text-error">سبب الفشل: {selectedLog.error}</Text> : null}
+                {selectedLog.status === 'failed' ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="إعادة محاولة السجل المحدد"
+                    disabled={retryingId === selectedLog.id}
+                    onPress={() => void retry(selectedLog)}
+                    style={({ pressed }) => ({ marginTop: 14, minHeight: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary, opacity: retryingId === selectedLog.id ? 0.6 : pressed ? 0.8 : 1 })}
+                  >
+                    {retryingId === selectedLog.id ? <ActivityIndicator color={colors.background} /> : <Text className="font-semibold" style={{ color: colors.background }}>إعادة المحاولة</Text>}
+                  </Pressable>
+                ) : null}
               </View>
             )}
             <FlatList

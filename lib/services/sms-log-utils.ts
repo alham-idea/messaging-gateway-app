@@ -22,6 +22,47 @@ export function maskPhoneNumber(phoneNumber: string): string {
   return `${normalized.slice(0, 4)}••••${normalized.slice(-3)}`;
 }
 
+export interface SmsLogSearch {
+  recipient: string;
+  fromDate: string;
+  toDate: string;
+}
+
+function normalizeSearch(value: string): string {
+  return value.replace(/[\s()-]/g, '').toLowerCase();
+}
+
+function phoneSearchVariants(value: string): string[] {
+  const normalized = normalizeSearch(value);
+  const variants = [normalized];
+  if (normalized.startsWith('+966')) variants.push(`0${normalized.slice(4)}`);
+  if (normalized.startsWith('00966')) variants.push(`0${normalized.slice(5)}`);
+  if (normalized.startsWith('0')) variants.push(`+966${normalized.slice(1)}`);
+  return variants;
+}
+
+function parseDateBoundary(value: string, endOfDay = false): number | null {
+  const match = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0);
+  return Number.isNaN(date.getTime()) ? null : date.getTime();
+}
+
+export function filterSmsLogsAdvanced(messages: DBMessage[], filter: SmsLogFilter, search: SmsLogSearch): DBMessage[] {
+  const recipientQuery = phoneSearchVariants(search.recipient);
+  const from = parseDateBoundary(search.fromDate);
+  const to = parseDateBoundary(search.toDate, true);
+
+  return filterSmsLogs(messages, filter).filter((message) => {
+    const messagePhoneVariants = phoneSearchVariants(message.phoneNumber);
+    const timestamp = message.createdAt || message.timestamp;
+    const matchesRecipient = !search.recipient.trim() || recipientQuery.some((query) => messagePhoneVariants.some((phone) => phone.includes(query)));
+    const matchesFrom = from === null || timestamp >= from;
+    const matchesTo = to === null || timestamp <= to;
+    return matchesRecipient && matchesFrom && matchesTo;
+  });
+}
+
 export function smsStatusLabel(status: DBMessage['status']): string {
   switch (status) {
     case 'sent': return 'تم الإرسال';

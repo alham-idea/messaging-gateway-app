@@ -6,6 +6,7 @@ import {
   Pressable,
   RefreshControl,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -16,7 +17,7 @@ import { useColors } from '@/hooks/use-colors';
 import { databaseService, type DBMessage } from '@/lib/services/database-service';
 import { messageHandlerService } from '@/lib/services/message-handler-service';
 import {
-  filterSmsLogs,
+  filterSmsLogsAdvanced,
   maskPhoneNumber,
   smsStatusColor,
   smsStatusIcon,
@@ -54,6 +55,8 @@ export default function SmsLogsScreen() {
   const [logs, setLogs] = useState<DBMessage[]>([]);
   const [stats, setStats] = useState({ total: 0, pending: 0, processing: 0, sent: 0, failed: 0 });
   const [filter, setFilter] = useState<SmsLogFilter>('all');
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [search, setSearch] = useState({ recipient: '', fromDate: '', toDate: '' });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -83,7 +86,7 @@ export default function SmsLogsScreen() {
     if (isFocused) void loadLogs();
   }, [isFocused, loadLogs]));
 
-  const visibleLogs = useMemo(() => filterSmsLogs(logs, filter), [logs, filter]);
+  const visibleLogs = useMemo(() => filterSmsLogsAdvanced(logs, filter, search), [logs, filter, search]);
 
   const retry = useCallback(async (item: DBMessage) => {
     setRetryingId(item.id);
@@ -185,6 +188,63 @@ export default function SmsLogsScreen() {
               </Pressable>
             </View>
             {renderSummary()}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded: advancedOpen }}
+              onPress={() => setAdvancedOpen((open) => !open)}
+              style={({ pressed }) => ({
+                minHeight: 44,
+                marginBottom: advancedOpen ? 10 : 16,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.surface,
+                justifyContent: 'center',
+                paddingHorizontal: 14,
+                opacity: pressed ? 0.7 : 1,
+              })}
+            >
+              <Text className="font-semibold text-foreground">{advancedOpen ? 'إخفاء البحث المتقدم' : 'بحث متقدم'}</Text>
+            </Pressable>
+            {advancedOpen && (
+              <View className="mb-4 rounded-2xl border border-border bg-surface p-4">
+                <Text className="mb-2 text-sm font-semibold text-foreground">تصفية السجلات</Text>
+                <TextInput
+                  value={search.recipient}
+                  onChangeText={(recipient) => setSearch((current) => ({ ...current, recipient }))}
+                  placeholder="رقم المستلم"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="phone-pad"
+                  autoCorrect={false}
+                  style={{ borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, color: colors.foreground, marginBottom: 10 }}
+                />
+                <View className="flex-row gap-2">
+                  <TextInput
+                    value={search.fromDate}
+                    onChangeText={(fromDate) => setSearch((current) => ({ ...current, fromDate }))}
+                    placeholder="من: YYYY-MM-DD"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="numbers-and-punctuation"
+                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 10, color: colors.foreground }}
+                  />
+                  <TextInput
+                    value={search.toDate}
+                    onChangeText={(toDate) => setSearch((current) => ({ ...current, toDate }))}
+                    placeholder="إلى: YYYY-MM-DD"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="numbers-and-punctuation"
+                    style={{ flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 10, color: colors.foreground }}
+                  />
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setSearch({ recipient: '', fromDate: '', toDate: '' })}
+                  style={({ pressed }) => ({ alignSelf: 'flex-start', marginTop: 10, paddingVertical: 6, opacity: pressed ? 0.6 : 1 })}
+                >
+                  <Text className="font-semibold text-primary">مسح البحث</Text>
+                </Pressable>
+              </View>
+            )}
             <FlatList
               horizontal
               showsHorizontalScrollIndicator={false}

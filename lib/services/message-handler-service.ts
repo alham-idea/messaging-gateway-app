@@ -5,6 +5,7 @@ import { Platform } from 'react-native';
 import { databaseService } from './database-service';
 import { subscriptionClientService } from './subscription-client-service';
 import { settingsService } from './settings-service';
+import { localNotificationService } from './local-notification-service';
 
 export interface ProcessedMessage {
   id: string;
@@ -217,6 +218,13 @@ class MessageHandlerService {
 
       // Failed
       await databaseService.updateMessageStatus(message.id, 'failed', errorMessage);
+      if (message.type === 'sms') {
+        void localNotificationService.notifySmsFailure({
+          messageId: message.id,
+          phoneNumber: message.phoneNumber,
+          error: errorMessage,
+        });
+      }
       this.sendResponse({
         id: message.id,
         payload: message,

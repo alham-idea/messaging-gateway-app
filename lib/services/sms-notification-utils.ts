@@ -12,6 +12,6 @@ export function buildSmsFailureNotification(input: SmsFailureNotificationInput) 
   return {
     title: 'فشل إرسال SMS',
     body: `تعذر إرسال الرسالة إلى ${masked}`,
-    data: { screen: '/sms-logs', messageId: input.messageId },
+    data: { kind: 'sms-failure', screen: '/sms-logs', messageId: input.messageId },
   };
 }

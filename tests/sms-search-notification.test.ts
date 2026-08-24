@@ -41,6 +41,6 @@ describe('SMS search and failure notification', () => {
     expect(request.title).toBe('فشل إرسال SMS');
     expect(request.body).toContain('+966••••567');
     expect(request.body).not.toContain('النص لا يظهر');
-    expect(request.data).toEqual({ screen: '/sms-logs', messageId: 'sms-1' });
+    expect(request.data).toEqual({ kind: 'sms-failure', screen: '/sms-logs', messageId: 'sms-1' });
   });
 });

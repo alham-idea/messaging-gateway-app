@@ -1,6 +1,7 @@
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
+import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -19,6 +20,7 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { messageHandlerService } from "@/lib/services/message-handler-service";
+import { parseSmsFailureNotificationData } from "@/lib/services/sms-notification-navigation";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -33,6 +35,20 @@ export default function RootLayout() {
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
+  const router = useRouter();
+
+  useEffect(() => {
+    const openSmsLogsFromNotification = (response: Notifications.NotificationResponse | null) => {
+      const data = response?.notification.request.content.data;
+      if (parseSmsFailureNotificationData(data)) {
+        router.push('/sms-logs');
+      }
+    };
+
+    void Notifications.getLastNotificationResponseAsync().then(openSmsLogsFromNotification);
+    const subscription = Notifications.addNotificationResponseReceivedListener(openSmsLogsFromNotification);
+    return () => subscription.remove();
+  }, [router]);
 
   // Initialize Manus runtime and Message Handler Service
   useEffect(() => {
@@ -92,6 +108,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="whatsapp" />
             <Stack.Screen name="logs" />
+            <Stack.Screen name="sms-logs" />
             <Stack.Screen name="settings" />
             <Stack.Screen name="connection-manager" />
             <Stack.Screen name="failed-messages" />

@@ -32,6 +32,7 @@ async function authenticateAdminJwt(req: CreateExpressContextOptions["req"]): Pr
 
     const adminUser = await getAdminUserByEmail(payload.email);
     if (!adminUser || !adminUser.isActive) return null;
+    if (adminUser.id !== payload.adminId) return null;
     if (adminUser.role !== "admin" && adminUser.role !== "super_admin") return null;
 
     return {
@@ -41,6 +42,7 @@ async function authenticateAdminJwt(req: CreateExpressContextOptions["req"]): Pr
       email: adminUser.email,
       loginMethod: "admin",
       role: "admin",
+      isActive: adminUser.isActive,
       createdAt: new Date(0),
       updatedAt: new Date(0),
       lastSignedIn: new Date(),

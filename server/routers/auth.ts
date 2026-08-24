@@ -4,6 +4,8 @@ import * as db from "../db";
 import { TRPCError } from "@trpc/server";
 import jwt from "jsonwebtoken";
 import { trpcHandler, findOrThrow } from "../_core/router-utils";
+import { COOKIE_NAME } from "../../shared/const";
+import { getSessionCookieOptions } from "../_core/cookies";
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -91,12 +93,13 @@ export const authRouter = router({
     )
     .mutation(async ({ input }) => {
       return trpcHandler(async () => {
-        let user = await db.getUserByEmail(input.email);
+        const normalizedEmail = input.email.trim().toLowerCase();
+        let user = await db.getUserByEmail(normalizedEmail);
 
         if (!user) {
           const result = await db.createUser({
             name: input.name,
-            email: input.email,
+            email: normalizedEmail,
             loginMethod: input.loginMethod,
           });
 
@@ -172,9 +175,20 @@ export const authRouter = router({
     )
     .mutation(async ({ input, ctx }) => {
       return trpcHandler(async () => {
+        const normalizedEmail = input.email?.trim().toLowerCase();
+        if (normalizedEmail) {
+          const existingUser = await db.getUserByEmail(normalizedEmail);
+          if (existingUser && existingUser.id !== ctx.user.id) {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "Email already exists",
+            });
+          }
+        }
+
         await db.updateUser(ctx.user.id, {
           name: input.name,
-          email: input.email,
+          email: normalizedEmail,
         });
 
         const user = await db.getUserById(ctx.user.id);
@@ -193,10 +207,11 @@ export const authRouter = router({
    * Logout user
    */
   logout: publicProcedure.mutation(({ ctx }) => {
-    // TODO: Implement logout with cookie clearing
-    return {
-      success: true,
-    };
+    ctx.res.clearCookie(COOKIE_NAME, {
+      ...getSessionCookieOptions(ctx.req),
+      maxAge: -1,
+    });
+    return { success: true };
   }),
 
   /**

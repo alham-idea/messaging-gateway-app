@@ -24,6 +24,7 @@ describe("Subscriptions Integration Tests", () => {
         openId: null,
         loginMethod: "test",
         role: "user",
+        isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
         lastSignedIn: new Date(),

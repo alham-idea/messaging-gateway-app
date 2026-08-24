@@ -1,4 +1,4 @@
-import { router, publicProcedure, protectedProcedure } from "@/server/_core/trpc";
+import { router, publicProcedure, protectedProcedure, adminProcedure } from "@/server/_core/trpc";
 import { z } from "zod";
 import {
   createNotification,
@@ -142,7 +142,7 @@ export const notificationsRouter = router({
   /**
    * Admin: Create notification for user
    */
-  createNotification: protectedProcedure
+  createNotification: adminProcedure
     .input(
       z.object({
         userId: z.number(),
@@ -154,11 +154,6 @@ export const notificationsRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      // Check if user is admin
-      if (ctx.user.role !== "admin") {
-        throw new Error("Unauthorized");
-      }
-
       return await createNotification(input.userId, {
         type: input.type as any,
         title: input.title,
@@ -171,11 +166,7 @@ export const notificationsRouter = router({
   /**
    * Get email queue status
    */
-  getEmailQueueStatus: protectedProcedure.query(async ({ ctx }) => {
-    if (ctx.user.role !== "admin") {
-      throw new Error("Unauthorized");
-    }
-
+  getEmailQueueStatus: adminProcedure.query(async () => {
     return await getEmailQueue({
       limit: 100,
       status: "pending",
@@ -185,13 +176,9 @@ export const notificationsRouter = router({
   /**
    * Retry failed email
    */
-  retryFailedEmail: protectedProcedure
-    .input(z.object({ emailId: z.number() }))
-    .mutation(async ({ input, ctx }) => {
-      if (ctx.user.role !== "admin") {
-        throw new Error("Unauthorized");
-      }
-
+  retryFailedEmail: adminProcedure
+    .input(z.object({ emailId: z.number().int().positive() }))
+    .mutation(async ({ input }) => {
       return await updateEmailQueueStatus(input.emailId, "pending");
     }),
 });

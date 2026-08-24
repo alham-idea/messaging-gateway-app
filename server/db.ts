@@ -1187,6 +1187,13 @@ export async function getAllUsers() {
   return db.select().from(users);
 }
 
+export async function getAllSubscriptions() {
+  const db = await getDb();
+  if (!db) return [];
+
+  return db.select().from(userSubscriptions).orderBy(desc(userSubscriptions.createdAt));
+}
+
 export async function getAllActiveSubscriptions() {
   const db = await getDb();
   if (!db) return [];

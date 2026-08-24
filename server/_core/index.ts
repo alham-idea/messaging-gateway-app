@@ -85,9 +85,11 @@ async function startServer() {
 
   // Admin login route
   app.post("/api/admin/login", async (req, res) => {
-    const { email, password } = req.body;
+    const rawEmail = req.body?.email;
+    const password = req.body?.password;
+    const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
 
-    if (!email || !password) {
+    if (!email || typeof password !== "string" || password.length === 0) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
@@ -101,7 +103,7 @@ async function startServer() {
       const { getAdminUserByEmail, verifyPassword } = await import("../db");
       const adminUser = await getAdminUserByEmail(email);
 
-      if (!adminUser || !adminUser.passwordHash) {
+      if (!adminUser || !adminUser.isActive || !adminUser.passwordHash) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
 

@@ -26,7 +26,7 @@ export async function trpcHandler<T>(
 export function requireAdmin(ctx: { user?: { role?: string } | null }, action?: string): void {
   if (ctx.user?.role !== "admin" && (ctx.user?.role as string) !== "super_admin") {
     throw new TRPCError({
-      code: "UNAUTHORIZED",
+      code: "FORBIDDEN",
       message: action
         ? `Only admins can ${action}`
         : "Admin access required",

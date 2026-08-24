@@ -33,7 +33,7 @@ export const adminRouter = router({
 
       const failedPayments = payments?.filter((p: any) => p.paymentStatus === "failed").length || 0;
 
-      const chartData = generateChartData();
+      const chartData = buildChartData(users || [], payments || []);
 
       return {
         totalUsers,
@@ -64,12 +64,22 @@ export const adminRouter = router({
         const users = await db.getAllUsers();
         let filtered = users || [];
 
-        if (input.search) {
+        if (input.search?.trim()) {
+          const search = input.search.trim().toLowerCase();
           filtered = filtered.filter(
             (u: any) =>
-              u.name?.toLowerCase().includes(input.search!.toLowerCase()) ||
-              u.email?.toLowerCase().includes(input.search!.toLowerCase())
+              u.name?.toLowerCase().includes(search) ||
+              u.email?.toLowerCase().includes(search)
           );
+        }
+
+        if (input.status === "active") {
+          filtered = filtered.filter((u: any) => u.isActive === true);
+        } else if (input.status === "inactive") {
+          filtered = filtered.filter((u: any) => u.isActive === false);
+        } else if (input.status === "suspended") {
+          // Suspension is not a persisted users state yet; never mislabel inactive users.
+          filtered = [];
         }
 
         const { items, total, limit, offset } = paginate(filtered, input);
@@ -121,11 +131,10 @@ export const adminRouter = router({
       return trpcHandler(async () => {
         requireAdmin(ctx, "update user status");
 
-        await db.updateUser(input.userId, {
-          role: input.isActive ? "user" : "user",
-        });
+        const user = await findOrThrow(() => db.getUserById(input.userId), "User");
+        await db.updateUser(user.id, { isActive: input.isActive });
 
-        return { success: true };
+        return { success: true, isActive: input.isActive };
       }, "Failed to update user status");
     }),
 
@@ -144,7 +153,7 @@ export const adminRouter = router({
       return trpcHandler(async () => {
         requireAdmin(ctx, "access subscriptions");
 
-        const subscriptions = await db.getAllActiveSubscriptions();
+        const subscriptions = await db.getAllSubscriptions();
         let filtered = subscriptions || [];
 
         if (input.status) {
@@ -187,58 +196,46 @@ export const adminRouter = router({
       })
     )
     .mutation(async ({ input, ctx }) => {
-      requireAdmin(ctx);
-      const dbInstance = await db.getDb();
-      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const { userSubscriptions } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
-
-      await dbInstance.update(userSubscriptions)
-        .set({ status: input.status })
-        .where(eq(userSubscriptions.id, input.subscriptionId));
-
-      return { success: true };
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "update subscription status");
+        const subscription = await findOrThrow(
+          () => db.getSubscriptionById(input.subscriptionId),
+          "Subscription",
+        );
+        await db.updateUserSubscription(subscription.id, { status: input.status });
+        return { success: true, status: input.status };
+      }, "Failed to update subscription status");
     }),
 
   updateSubscriptionPlan: protectedProcedure
     .input(z.object({ subscriptionId: z.number(), planId: z.number() }))
     .mutation(async ({ input, ctx }) => {
-      requireAdmin(ctx);
-      const dbInstance = await db.getDb();
-      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const { userSubscriptions } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
-
-      await dbInstance.update(userSubscriptions)
-        .set({ planId: input.planId })
-        .where(eq(userSubscriptions.id, input.subscriptionId));
-
-      return { success: true };
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "update subscription plan");
+        const subscription = await findOrThrow(
+          () => db.getSubscriptionById(input.subscriptionId),
+          "Subscription",
+        );
+        await findOrThrow(() => db.getSubscriptionPlan(input.planId), "Plan");
+        await db.updateUserSubscription(subscription.id, { planId: input.planId });
+        return { success: true, planId: input.planId };
+      }, "Failed to update subscription plan");
     }),
 
   extendSubscription: protectedProcedure
-    .input(z.object({ subscriptionId: z.number(), days: z.number() }))
+    .input(z.object({ subscriptionId: z.number().int().positive(), days: z.number().int().min(-365).max(3650) }))
     .mutation(async ({ input, ctx }) => {
-      requireAdmin(ctx);
-      const dbInstance = await db.getDb();
-      if (!dbInstance) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
-
-      const { userSubscriptions } = await import("../../drizzle/schema");
-      const { eq } = await import("drizzle-orm");
-
-      const sub = await dbInstance.select().from(userSubscriptions).where(eq(userSubscriptions.id, input.subscriptionId)).limit(1);
-      if (!sub || sub.length === 0) throw new TRPCError({ code: "NOT_FOUND" });
-
-      const currentEndDate = new Date(sub[0].endDate || new Date());
-      currentEndDate.setDate(currentEndDate.getDate() + input.days);
-
-      await dbInstance.update(userSubscriptions)
-        .set({ endDate: currentEndDate })
-        .where(eq(userSubscriptions.id, input.subscriptionId));
-
-      return { success: true, newEndDate: currentEndDate };
+      return trpcHandler(async () => {
+        requireAdmin(ctx, "extend subscription");
+        const subscription = await findOrThrow(
+          () => db.getSubscriptionById(input.subscriptionId),
+          "Subscription",
+        );
+        const currentEndDate = new Date(subscription.endDate || new Date());
+        currentEndDate.setDate(currentEndDate.getDate() + input.days);
+        await db.updateUserSubscription(subscription.id, { endDate: currentEndDate });
+        return { success: true, newEndDate: currentEndDate };
+      }, "Failed to extend subscription");
     }),
 
   resetSubscriptionQuota: protectedProcedure
@@ -383,13 +380,25 @@ export const adminRouter = router({
 });
 
 /**
- * Helper function to generate mock chart data
+ * Build a truthful six-month dashboard series from persisted records.
+ * Missing months remain zero instead of being filled with fabricated values.
  */
-function generateChartData() {
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun"];
-  return months.map((month, index) => ({
-    month,
-    revenue: Math.floor(Math.random() * 10000) + 5000,
-    users: Math.floor(Math.random() * 100) + 50,
-  }));
+function buildChartData(users: Array<{ createdAt: Date }>, payments: Array<{ createdAt: Date; amount: string; paymentStatus: string }>) {
+  const months = Array.from({ length: 6 }, (_, index) => {
+    const date = new Date();
+    date.setDate(1);
+    date.setMonth(date.getMonth() - (5 - index));
+    return date;
+  });
+
+  return months.map((monthStart) => {
+    const nextMonth = new Date(monthStart);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    const month = monthStart.toLocaleString("en-US", { month: "short" });
+    const usersInMonth = users.filter((user) => user.createdAt >= monthStart && user.createdAt < nextMonth).length;
+    const revenue = payments
+      .filter((payment) => payment.paymentStatus === "completed" && payment.createdAt >= monthStart && payment.createdAt < nextMonth)
+      .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+    return { month, revenue, users: usersInMonth };
+  });
 }

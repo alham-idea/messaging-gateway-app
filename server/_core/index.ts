@@ -36,9 +36,18 @@ async function startServer() {
     .split(",")
     .map(o => o.trim())
     .filter(Boolean);
+  const developmentOrigins = process.env.NODE_ENV === "production"
+    ? []
+    : [
+        "http://localhost:4173",
+        "http://localhost:4174",
+        "http://127.0.0.1:4173",
+        "http://127.0.0.1:4174",
+      ];
   const allowedOrigins = Array.from(
     new Set([
       ...configuredOrigins,
+      ...developmentOrigins,
       "https://msgatewayadm-4pkhhml8.manus.space",
     ]),
   );

@@ -26,7 +26,7 @@ export interface MessagePayload {
 
 export interface MessageResponse {
   messageId: string;
-  status: 'sent' | 'failed' | 'pending';
+  status: 'sent' | 'delivered' | 'failed' | 'pending';
   error?: string;
   timestamp: number;
 }

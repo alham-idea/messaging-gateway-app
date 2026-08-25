@@ -1,5 +1,6 @@
 import { WebViewMessageEvent } from 'react-native-webview';
 import { socketService, MessageResponse } from './socket-service';
+import { parseWhatsAppWebViewEvent } from './whatsapp-webview-events';
 
 export interface WhatsAppMessage {
   id: string;
@@ -34,28 +35,29 @@ class WhatsAppService {
    * معالجة الرسائل الواردة من WebView
    */
   public handleWebViewMessage(event: WebViewMessageEvent): void {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      console.log('📨 رسالة من WebView:', data);
+    const parsed = parseWhatsAppWebViewEvent(event.nativeEvent.data);
+    if (!parsed) {
+      console.warn('⚠️ تم تجاهل حدث WebView غير صالح أو غير مدعوم');
+      return;
+    }
 
-      switch (data.type) {
-        case 'WHATSAPP_READY':
-          this.handleWhatsAppReady();
-          break;
-        case 'MESSAGE_SENT':
-          this.handleMessageSent(data);
-          break;
-        case 'MESSAGE_RECEIVED':
-          this.handleMessageReceived(data);
-          break;
-        case 'ERROR':
-          this.handleError(data);
-          break;
-        default:
-          console.log('نوع رسالة غير معروف:', data.type);
-      }
-    } catch (error) {
-      console.error('خطأ في معالجة رسالة WebView:', error);
+    console.log('📨 حدث WhatsApp من WebView:', parsed.kind);
+    switch (parsed.kind) {
+      case 'ready':
+        this.handleWhatsAppReady();
+        break;
+      case 'sent':
+        this.handleMessageSent(parsed);
+        break;
+      case 'delivered':
+        this.handleMessageDelivered(parsed);
+        break;
+      case 'received':
+        this.handleMessageReceived(parsed);
+        break;
+      case 'error':
+        this.handleError(parsed);
+        break;
     }
   }
 
@@ -235,7 +237,7 @@ class WhatsAppService {
   /**
    * معالجة الرسالة المرسلة
    */
-  private handleMessageSent(data: any): void {
+  private handleMessageSent(data: { messageId: string; timestamp: number }): void {
     console.log('✓ تم إرسال الرسالة:', data.messageId);
 
     // إرسال تقرير إلى المنصة
@@ -249,14 +251,32 @@ class WhatsAppService {
   }
 
   /**
+   * معالجة تأكيد تسليم الرسالة
+   */
+  private handleMessageDelivered(data: { messageId: string; timestamp: number }): void {
+    const response: MessageResponse = {
+      messageId: data.messageId,
+      status: 'delivered',
+      timestamp: data.timestamp,
+    };
+
+    socketService.sendMessageResponse(response);
+  }
+
+  /**
    * معالجة الرسالة الواردة
    */
-  private handleMessageReceived(data: any): void {
+  private handleMessageReceived(data: {
+    messageId: string;
+    phoneNumber: string;
+    message: string;
+    timestamp: number;
+  }): void {
     const message: WhatsAppMessage = {
-      id: data.id || `msg_${Date.now()}`,
-      phoneNumber: data.phoneNumber || 'unknown',
-      message: data.message || '',
-      timestamp: data.timestamp || Date.now(),
+      id: data.messageId,
+      phoneNumber: data.phoneNumber,
+      message: data.message,
+      timestamp: data.timestamp,
       status: 'received',
     };
 
@@ -382,6 +402,7 @@ class WhatsAppService {
                 
                 window.ReactNativeWebView?.postMessage(JSON.stringify({
                   type: 'MESSAGE_RECEIVED',
+                  messageId: msg.getAttribute('data-id') || ('received_' + Date.now()),
                   phoneNumber: sender,
                   message: text,
                   timestamp: Date.now()

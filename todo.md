@@ -12235,3 +12235,45 @@
 - [ ] قراءة todo.md قبل checkpoint
 - [ ] حفظ checkpoint لقسم WhatsApp
 - [ ] طلب اعتماد المستخدم للانتقال إلى تدقيق Android الشامل
+
+
+## اختبارات WebView mock لرسائل WhatsApp
+- [ ] مراجعة عقد أحداث WebView الحالية للاستلام والتسليم
+- [ ] عزل تحويل أحداث WebView عن المكونات الأصلية القابلة للاختبار
+- [ ] اختبار حدث استلام WhatsApp وربطه بالـ messageId
+- [ ] اختبار حدث تسليم WhatsApp وربطه بالـ messageId والحالة
+- [ ] اختبار تجاهل الأحداث غير الصالحة أو الخاصة بقناة SMS
+- [ ] اختبار عدم تكرار تحديث السجل عند تكرار الحدث
+- [ ] تشغيل TypeScript والاختبارات والبناء
+- [ ] قراءة todo.md قبل checkpoint
+- [ ] حفظ checkpoint بعد اكتمال الاختبارات
+
+
+## اختبارات WebView mock — سجل الإنجاز
+- [x] إنشاء محول نقي لأحداث WebView في `whatsapp-webview-events.ts`
+- [x] دعم حدث الجاهزية `WHATSAPP_READY`
+- [x] دعم حدث الإرسال `MESSAGE_SENT`
+- [x] دعم حدث التسليم `MESSAGE_DELIVERED` مع حفظ `messageId`
+- [x] دعم حدث الاستلام `MESSAGE_RECEIVED` مع معرف وارد مستقل
+- [x] تجاهل JSON غير الصالح والأحداث الناقصة وأحداث SMS
+- [x] ربط المحول بخدمة WhatsApp الفعلية
+- [x] إضافة تقرير `delivered` إلى عقد Socket
+- [x] تحديث مواصفات API العربية والإنجليزية
+- [x] إضافة اختبارات WebView mock حتمية دون native WebView
+- [x] نجاح TypeScript و17 اختباراً مستهدفاً والبناء
+- [ ] اختبار الأحداث الفعلية عبر WebView على جهاز Android
+- [ ] حفظ checkpoint لهذه الجولة
+
+
+## اختبارات WebView mock — الإنجاز
+- [x] إنشاء محول نقي لأحداث WebView دون اعتماد على native WebView
+- [x] اختبار `WHATSAPP_READY`
+- [x] اختبار `MESSAGE_SENT` وربطه بالـ `messageId`
+- [x] اختبار `MESSAGE_DELIVERED` وربطه بالـ `messageId`
+- [x] اختبار `MESSAGE_RECEIVED` وحفظ المعرف الوارد
+- [x] اختبار رفض JSON غير الصالح والأحداث الناقصة وأحداث SMS
+- [x] ربط المحول بخدمة WhatsApp الفعلية
+- [x] تحديث `MessageResponse` ومواصفات API لدعم `delivered`
+- [x] نجاح TypeScript والبناء و17 اختباراً مستهدفاً
+- [ ] اختبار WebView الفعلي على جهاز Android
+- [ ] حفظ checkpoint لهذه الجولة

@@ -102,8 +102,10 @@ interface DeviceStatus {
 ```typescript
 interface MessageResponse {
   messageId: string;       // معرف الرسالة الأصلي
-  status: 'sent' | 'failed' | 'pending'; // الحالة
+  status: 'sent' | 'delivered' | 'failed' | 'pending'; // الحالة
   error?: string;          // رسالة الخطأ في حال الفشل
   timestamp: number;
 }
 ```
+
+قد ترسل WebView الخاصة بـ WhatsApp حدث `MESSAGE_DELIVERED` بعد `MESSAGE_SENT` مع الحفاظ على `messageId` الأصلي. أما الرسائل الواردة فتستخدم حدث `MESSAGE_RECEIVED` مع `messageId` مستقل. تُهمل الأحداث غير الصالحة أو أحداث SMS داخل محول WhatsApp.

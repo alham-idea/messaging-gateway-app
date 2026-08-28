@@ -179,3 +179,17 @@ Native Android Socket.io clients are not subject to browser CORS, but the admin 
 WhatsApp commands are accepted only with `type: "whatsapp"` and are routed through `messageHandlerService` to the active `whatsAppService` WebView adapter. The UI hook must not subscribe a second `send_message` listener or call a WhatsApp adapter directly; `socketService` owns the single inbound command listener and exposes `off()` for lifecycle cleanup. Messages remain `pending` while the WebView is not ready and are not reported as sent until the WebView acknowledgement is received.
 
 SMS commands continue through the independent `smsService` path. They must not be forwarded to WhatsApp, and WhatsApp readiness, queue length, events, and retry operations must not be reused as SMS state. WebView monitoring events must use `window.ReactNativeWebView.postMessage(JSON.stringify(...))` so the native `onMessage` handler receives them.
+
+
+## Central backend Socket.io activation
+
+The central backend now attaches Socket.io to the same HTTP server as the API. The endpoint uses `/socket.io`, supports WebSocket with polling fallback, and authenticates dashboard connections with the admin JWT in `handshake.auth.token`. Unauthenticated or inactive-admin connections are rejected during the handshake.
+
+The standalone dashboard should use:
+
+```env
+VITE_SOCKET_URL=https://msg-gateway-7lqw9uuq.manus.space
+VITE_SOCKET_PATH=/socket.io
+```
+
+After connection, the dashboard emits `admin:subscribe` and receives `connection_status`. Admin realtime events are emitted to the `admins` room using `notification`, `admin:notification`, `update`, or `admin:update`. SMS and WhatsApp events must remain channel-specific and must never be broadcast to the other channel.

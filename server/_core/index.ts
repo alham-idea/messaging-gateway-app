@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { attachSocketServer } from "./socket";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -29,6 +30,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  const io = attachSocketServer(server);
+  void io;
 
   // CORS middleware — allow configured origins plus the published admin dashboard.
   // The explicit fallback keeps login working while a deployment picks up the env value.
@@ -154,6 +157,7 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`[api] server listening on port ${port}`);
+    console.log(`[socket] Socket.io enabled at /socket.io`);
     console.log(`[admin] dashboard is maintained separately at ${adminDashboardUrl}`);
   });
 }

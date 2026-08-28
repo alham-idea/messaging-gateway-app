@@ -39,3 +39,7 @@ Flexible plans managed via the Idea Backend (Basic, Professional, Enterprise) to
 ## Standalone Admin Dashboard Connectivity
 
 The standalone Admin Dashboard uses the central backend for authentication, operational metrics, subscriptions, invoices, and gateway status. For browser requests to succeed, configure `CORS_ALLOWED_ORIGINS` on the backend with the exact dashboard origin `https://msgatewayadm-4pkhhml8.manus.space`, without a trailing slash, then restart and redeploy the backend. The dashboard does not connect directly to the database and does not contain gateway credentials.
+
+
+### 7. Real-time Admin Updates
+The standalone Admin Dashboard can receive operational updates over the central backend's authenticated Socket.io channel. After an admin signs in, the dashboard subscribes to the admin room and receives connection status plus notification and gateway updates without a manual refresh. The realtime channel is authenticated with the current admin JWT; SMS and WhatsApp statuses remain logically separated, and a disconnected socket does not change the persisted message status.
